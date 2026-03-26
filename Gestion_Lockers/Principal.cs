@@ -352,27 +352,27 @@ namespace Gestion_Lockers
         // Menú — Mapa
         // ─────────────────────────────────────────────
 
-        private void verToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                var mapa = new Mapa();
-                mapa.StartPosition = FormStartPosition.CenterParent;
-                mapa.ShowDialog(this);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"No se pudo abrir el mapa: {ex.Message}",
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
+        //private void verToolStripMenuItem_Click(object sender, EventArgs e)
+        //{
+        //    try
+        //    {
+        //        var mapa = new Mapa();
+        //        mapa.StartPosition = FormStartPosition.CenterParent;
+        //        mapa.ShowDialog(this);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        MessageBox.Show($"No se pudo abrir el mapa: {ex.Message}",
+        //            "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        //    }
+        //}
 
         // ─────────────────────────────────────────────
         // Menú — Alumnos
         // ─────────────────────────────────────────────
 
-        private void asignarToolStripMenuItem_Click(object sender, EventArgs e)
-            => AbrirFormulario(() => new FrmAsignacion());
+        //private void asignarToolStripMenuItem_Click(object sender, EventArgs e)
+        //    => AbrirFormulario(() => new FrmAsignacion());
 
         private void renovarToolStripMenuItem_Click(object sender, EventArgs e)
             => AbrirFormulario(() => new frmRenovacionFuncion());
