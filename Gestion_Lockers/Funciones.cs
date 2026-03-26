@@ -17,14 +17,17 @@ namespace Gestion_Lockers
 
         internal record AsignacionInfo(string Nombre, string Matricula, string Telefono);
 
+        internal record BusquedaLockerInfo(
+            int IdLocker,
+            string Estado,
+            string Nombre,
+            string Matricula,
+            string Telefono);
+
         // ─────────────────────────────────────────────
         // Configuración visual del DataGridView
         // ─────────────────────────────────────────────
 
-        /// <summary>
-        /// Aplica fuente grande, alto de fila y estilo general al grid de lockers.
-        /// Llamar una sola vez en Principal_Load.
-        /// </summary>
         public static void ConfigurarGridLockers(DataGridView grid)
         {
             grid.DefaultCellStyle.Font = new Font("Century Gothic", 11F);
@@ -45,59 +48,105 @@ namespace Gestion_Lockers
         }
 
         // ─────────────────────────────────────────────
-        // Carga de pisos en ComboBox
+        // ComboBox jerárquico: Piso → Zona
         // ─────────────────────────────────────────────
 
-        public static void CargarPisos(ComboBox cbUbicacion)
+        public class UbicacionItem
         {
+            public string Texto { get; }
+            public int Piso { get; }
+            public string Zona { get; }
+            public bool EsEncabezado { get; }
+
+            public UbicacionItem(string texto, int piso, string zona, bool esEncabezado = false)
+            {
+                Texto = texto;
+                Piso = piso;
+                Zona = zona;
+                EsEncabezado = esEncabezado;
+            }
+
+            public override string ToString() => Texto;
+        }
+
+        /// <summary>
+        /// Rellena el ComboBox con entradas jerárquicas Piso → Zona.
+        /// Las zonas se leen de la columna `zona` de la tabla lockers.
+        /// </summary>
+        public static void CargarZonasEnCombo(ComboBox cbUbicacion)
+        {
+            cbUbicacion.Items.Clear();
+
             try
             {
                 using var conn = DBConnection.GetConnection();
-                using var cmd = new SQLiteCommand(
-                    "SELECT DISTINCT piso FROM lockers ORDER BY piso", conn);
-                using var reader = cmd.ExecuteReader();
 
-                cbUbicacion.Items.Clear();
-                while (reader.Read())
-                    cbUbicacion.Items.Add("Piso " + reader["piso"]);
+                var pisos = new List<int>();
+                using (var cmd = new SQLiteCommand(
+                    "SELECT DISTINCT piso FROM lockers ORDER BY piso;", conn))
+                using (var r = cmd.ExecuteReader())
+                    while (r.Read())
+                        pisos.Add(Convert.ToInt32(r["piso"]));
+
+                foreach (int piso in pisos)
+                {
+                    // Encabezado visual (no seleccionable)
+                    cbUbicacion.Items.Add(new UbicacionItem($"── Piso {piso} ──", piso, "", esEncabezado: true));
+
+                    // Todo el piso
+                    cbUbicacion.Items.Add(new UbicacionItem($"   Piso {piso} — Todo", piso, ""));
+
+                    // Zonas definidas para este piso
+                    using var cmdZ = new SQLiteCommand(@"
+                        SELECT DISTINCT zona FROM lockers
+                        WHERE piso = @p AND zona IS NOT NULL AND zona <> ''
+                        ORDER BY zona;", conn);
+                    cmdZ.Parameters.AddWithValue("@p", piso);
+                    using var rz = cmdZ.ExecuteReader();
+                    while (rz.Read())
+                    {
+                        string zona = rz["zona"]?.ToString() ?? string.Empty;
+                        cbUbicacion.Items.Add(new UbicacionItem($"   Piso {piso} — {zona}", piso, zona));
+                    }
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error al cargar pisos: " + ex.Message,
+                MessageBox.Show("Error al cargar zonas: " + ex.Message,
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         // ─────────────────────────────────────────────
-        // Carga de estados desde BD al diccionario
+        // Carga de estados desde BD
         // ─────────────────────────────────────────────
 
         public static void CargarEstadosDesdeBD(Diccionario dic)
             => dic.CargarEstados();
 
         // ─────────────────────────────────────────────
-        // MAPA GENÉRICO — lee estructura desde la BD
+        // MAPA GENÉRICO — lee estructura desde BD
         // ─────────────────────────────────────────────
 
-        /// <summary>
-        /// Dibuja el mapa de lockers de un piso leyendo la BD.
-        /// Los lockers numéricos se organizan en filas (centenas del id).
-        /// Los lockers con id alfanumérico (SA_*) se añaden al final como columnas extra.
-        /// </summary>
-        public static void DibujarMapaPiso(DataGridView grid, Diccionario dic, int piso)
+        public static void DibujarMapaPiso(DataGridView grid, Diccionario dic, int piso, string zona = "")
         {
-            // 1. Leer todos los lockers del piso
-            var numericos = new SortedDictionary<int, SortedSet<int>>(); // fila → columnas
-            var alfanumericos = new List<string>();                          // SA_*, SA-DAVID_*, etc.
+            var numericos = new SortedDictionary<int, SortedSet<int>>();
+            var alfanumericos = new List<string>();
 
             try
             {
                 using var conn = DBConnection.GetConnection();
-                using var cmd = new SQLiteCommand(
-                    "SELECT id_locker FROM lockers WHERE piso = @piso ORDER BY id_locker ASC", conn);
-                cmd.Parameters.AddWithValue("@piso", piso);
-                using var reader = cmd.ExecuteReader();
 
+                string sql = string.IsNullOrEmpty(zona)
+                    ? "SELECT id_locker FROM lockers WHERE piso = @piso ORDER BY id_locker ASC"
+                    : "SELECT id_locker FROM lockers WHERE piso = @piso AND zona = @zona ORDER BY id_locker ASC";
+
+                using var cmd = new SQLiteCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@piso", piso);
+                if (!string.IsNullOrEmpty(zona))
+                    cmd.Parameters.AddWithValue("@zona", zona);
+
+                using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
                     string raw = reader["id_locker"]?.ToString() ?? string.Empty;
@@ -105,9 +154,8 @@ namespace Gestion_Lockers
 
                     if (int.TryParse(raw, out int id))
                     {
-                        // id numérico: extraer fila (centenas) y columna (decenas+unidades)
-                        int fila = (id / 100) % 10;   // p.e. 2304 → 3
-                        int columna = id % 100;           // p.e. 2304 → 4
+                        int fila = (id / 100) % 10;
+                        int columna = id % 100;
                         if (!numericos.ContainsKey(fila))
                             numericos[fila] = new SortedSet<int>();
                         numericos[fila].Add(columna);
@@ -120,67 +168,64 @@ namespace Gestion_Lockers
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error leyendo lockers del piso: " + ex.Message,
+                MessageBox.Show("Error leyendo lockers: " + ex.Message,
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
             if (numericos.Count == 0 && alfanumericos.Count == 0) return;
 
-            // 2. Calcular dimensiones del grid
             int totalFilas = numericos.Count;
+            int minColumna = int.MaxValue;
             int maxColumna = 0;
             foreach (var fila in numericos.Values)
                 foreach (int col in fila)
+                {
+                    if (col < minColumna) minColumna = col;
                     if (col > maxColumna) maxColumna = col;
+                }
 
-            // Determinar ancho de columna según cantidad
-            int colWidth = maxColumna <= 60 ? 52 : 44;
+            // Número real de columnas del bloque (ej. Bloque 2: 21-40 → 20 columnas)
+            int totalCols = maxColumna - minColumna + 1;
+            int colWidth = totalCols <= 60 ? 52 : 44;
 
-            // 3. Construir el grid base (solo numércos)
             grid.SuspendLayout();
             grid.DataSource = null;
             grid.Rows.Clear();
             grid.Columns.Clear();
 
-            for (int c = 1; c <= maxColumna; c++)
+            for (int c = 0; c < totalCols; c++)
             {
                 grid.Columns.Add("col" + c, "");
-                grid.Columns[c - 1].Width = colWidth;
+                grid.Columns[c].Width = colWidth;
             }
 
             grid.Rows.Add(totalFilas);
             grid.RowHeadersVisible = false;
 
-            // 4. Rellenar valores numéricos
             int rowIdx = 0;
             foreach (var kvp in numericos)
             {
                 int fila = kvp.Key;
-                int pisoBase = piso * 1000;
-                int filaBase = pisoBase + fila * 100;
+                int filaBase = piso * 1000 + fila * 100;
 
-                for (int c = 1; c <= maxColumna; c++)
+                // Reindexar: columna real → posición en el grid (offset por minColumna)
+                foreach (int col in kvp.Value)
                 {
-                    int idLocker = filaBase + c;
-                    // Solo poner valor si ese locker existe en BD
-                    if (kvp.Value.Contains(c))
-                        grid.Rows[rowIdx].Cells[c - 1].Value = idLocker.ToString();
+                    int gridCol = col - minColumna;
+                    if (gridCol >= 0 && gridCol < totalCols)
+                        grid.Rows[rowIdx].Cells[gridCol].Value = (filaBase + col).ToString();
                 }
+
                 rowIdx++;
             }
 
-            // 5. Agregar columnas extra para SA_* (grupos separados por fila)
             if (alfanumericos.Count > 0)
             {
-                // Agrupar SA por posición de fila implícita (mismo dígito de centena que los numéricos)
-                // Colocarlos en columnas extra al final, agrupados en filas equivalentes
                 var saGrid = OrganizarSAEnFilas(alfanumericos, totalFilas);
-
                 int saColCount = saGrid.GetLength(1);
                 int startCol = grid.Columns.Count;
 
-                // Columna separadora vacía
                 grid.Columns.Add("sep", "");
                 grid.Columns[startCol].Width = 10;
                 startCol++;
@@ -198,18 +243,11 @@ namespace Gestion_Lockers
             }
 
             grid.ResumeLayout();
-
-            // 6. Aplicar colores de estado
             ApplyEstadosEnGrid(grid, dic);
         }
 
-        /// <summary>
-        /// Organiza los lockers SA en una matriz [filas x columnas] deduciendo la fila
-        /// a partir del dígito de centena embebido en el nombre (SA_3261 → fila 2 del piso 3).
-        /// </summary>
         private static string[,] OrganizarSAEnFilas(List<string> alfanumericos, int totalFilas)
         {
-            // Construir diccionario fila → lista de ids
             var porFila = new SortedDictionary<int, List<string>>();
             foreach (string id in alfanumericos)
             {
@@ -219,7 +257,6 @@ namespace Gestion_Lockers
                 porFila[fila].Add(id);
             }
 
-            // Máximo de SA por fila → número de columnas
             int maxCols = 1;
             foreach (var v in porFila.Values)
                 if (v.Count > maxCols) maxCols = v.Count;
@@ -227,28 +264,19 @@ namespace Gestion_Lockers
             var resultado = new string[totalFilas, maxCols];
             foreach (var kvp in porFila)
             {
-                // Mapear fila del SA (1-based centenas) a rowIndex (0-based)
-                int rowIdx = kvp.Key - 1;
-                if (rowIdx < 0 || rowIdx >= totalFilas) rowIdx = 0;
+                int r = kvp.Key - 1;
+                if (r < 0 || r >= totalFilas) r = 0;
                 for (int i = 0; i < kvp.Value.Count; i++)
-                    resultado[rowIdx, i] = kvp.Value[i];
+                    resultado[r, i] = kvp.Value[i];
             }
-
             return resultado;
         }
 
-        /// <summary>
-        /// Extrae el índice de fila (1-4) de un id SA_* buscando el dígito de centena
-        /// dentro del número embebido al final del string (ej. SA_3261 → 2).
-        /// </summary>
         private static int ExtraerFilaDeSA(string id, int totalFilas)
         {
-            // Buscar secuencia de 4 dígitos al final del string
             int numStart = -1;
             for (int i = id.Length - 1; i >= 0; i--)
-            {
                 if (!char.IsDigit(id[i])) { numStart = i + 1; break; }
-            }
             if (numStart < 0) numStart = 0;
 
             string numPart = id.Substring(numStart);
@@ -261,7 +289,7 @@ namespace Gestion_Lockers
         }
 
         // ─────────────────────────────────────────────
-        // Aplicar colores de estado al grid
+        // Colores de estado
         // ─────────────────────────────────────────────
 
         public static void ApplyEstadosEnGrid(DataGridView grid, Diccionario dic)
@@ -292,7 +320,6 @@ namespace Gestion_Lockers
                     }
                     else
                     {
-                        // id existe en el grid pero no en BD → celda hueca
                         cell.Style.BackColor = Color.WhiteSmoke;
                         cell.Style.ForeColor = Color.LightGray;
                     }
@@ -301,12 +328,187 @@ namespace Gestion_Lockers
         }
 
         // ─────────────────────────────────────────────
-        // Consultas de alumnos / asignaciones
+        // Búsqueda de locker
         // ─────────────────────────────────────────────
 
         /// <summary>
-        /// Devuelve la info del alumno con asignación activa en ese locker, o null.
+        /// Busca un locker por id numérico, nombre o matrícula del alumno asignado.
+        /// Devuelve null si no encuentra resultado.
         /// </summary>
+        public static BusquedaLockerInfo? BuscarLocker(string termino)
+        {
+            if (string.IsNullOrWhiteSpace(termino)) return null;
+            string t = termino.Trim();
+
+            try
+            {
+                using var conn = DBConnection.GetConnection();
+
+                // Búsqueda por id numérico exacto
+                if (int.TryParse(t, out int idNum))
+                {
+                    const string sqlId = @"
+                        SELECT l.id_locker, l.estado,
+                               COALESCE(al.nombre,    '') AS nombre,
+                               COALESCE(al.matricula, '') AS matricula,
+                               COALESCE(al.telefono,  '') AS telefono
+                        FROM   lockers l
+                        LEFT JOIN asignaciones a  ON l.id_locker = a.id_locker AND a.activa = 1
+                        LEFT JOIN alumnos      al ON a.matricula  = al.matricula
+                        WHERE  l.id_locker = @id
+                        LIMIT  1;";
+                    using var cmd = new SQLiteCommand(sqlId, conn);
+                    cmd.Parameters.AddWithValue("@id", idNum);
+                    using var r = cmd.ExecuteReader();
+                    if (r.Read())
+                        return new BusquedaLockerInfo(
+                            Convert.ToInt32(r["id_locker"]),
+                            r["estado"]?.ToString() ?? string.Empty,
+                            r["nombre"]?.ToString() ?? string.Empty,
+                            r["matricula"]?.ToString() ?? string.Empty,
+                            r["telefono"]?.ToString() ?? string.Empty);
+
+                    MessageBox.Show($"No se encontró el locker {idNum}.",
+                        "Sin resultados", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return null;
+                }
+
+                // Búsqueda por nombre o matrícula
+                const string sqlNombre = @"
+                    SELECT l.id_locker, l.estado,
+                           al.nombre, al.matricula, al.telefono
+                    FROM   asignaciones a
+                    JOIN   alumnos al ON a.matricula = al.matricula
+                    JOIN   lockers l  ON a.id_locker = l.id_locker
+                    WHERE  a.activa = 1
+                      AND  (al.nombre    LIKE @term COLLATE NOCASE
+                         OR al.matricula LIKE @term COLLATE NOCASE)
+                    ORDER  BY al.nombre ASC
+                    LIMIT  1;";
+                using var cmd2 = new SQLiteCommand(sqlNombre, conn);
+                cmd2.Parameters.AddWithValue("@term", "%" + t + "%");
+                using var r2 = cmd2.ExecuteReader();
+                if (r2.Read())
+                    return new BusquedaLockerInfo(
+                        Convert.ToInt32(r2["id_locker"]),
+                        r2["estado"]?.ToString() ?? string.Empty,
+                        r2["nombre"]?.ToString() ?? string.Empty,
+                        r2["matricula"]?.ToString() ?? string.Empty,
+                        r2["telefono"]?.ToString() ?? string.Empty);
+
+                MessageBox.Show($"No se encontró ningún alumno con '{t}'.",
+                    "Sin resultados", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error en búsqueda: " + ex.Message,
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
+            return null;
+        }
+
+        // ─────────────────────────────────────────────
+        // Verificación automática de vencimiento
+        // ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Verifica si existe un periodo de renovación vencido.
+        /// Si es así, muestra aviso al usuario y, si confirma, cierra el periodo:
+        ///   - Asignaciones de lockers en estado Renovación → inactivas
+        ///   - Lockers en estado Renovación → Disponible (estado 0)
+        ///   - Periodo → marcado como procesado
+        /// </summary>
+        public static bool VerificarYCerrarVencimiento(IWin32Window owner)
+        {
+            try
+            {
+                using var conn = DBConnection.GetConnection();
+
+                // Buscar periodo vencido (si existe en BD es que aún no fue cerrado)
+                const string sqlCheck = @"
+                    SELECT id_renovacion, fecha_fin
+                    FROM   Renovacion
+                    WHERE  fecha_fin IS NOT NULL
+                      AND  date(fecha_fin) < date('now')
+                    ORDER  BY fecha_fin DESC
+                    LIMIT  1;";
+
+                long? idRenovacion = null;
+                string? fechaFinStr = null;
+
+                using (var cmd = new SQLiteCommand(sqlCheck, conn))
+                using (var r = cmd.ExecuteReader())
+                {
+                    if (r.Read())
+                    {
+                        idRenovacion = Convert.ToInt64(r["id_renovacion"]);
+                        fechaFinStr = r["fecha_fin"]?.ToString();
+                    }
+                }
+
+                if (!idRenovacion.HasValue) return false;
+
+                string fechaMostrar = "--/--/----";
+                if (DateTime.TryParse(fechaFinStr, out DateTime ff))
+                    fechaMostrar = ff.ToLocalTime().ToString("dd/MM/yyyy");
+
+                var dr = MessageBox.Show(
+                    $"El periodo de renovación venció el {fechaMostrar}.\n\n" +
+                    "Los lockers que NO renovaron quedarán DISPONIBLES y sus asignaciones se cerrarán.\n" +
+                    "Los lockers que sí renovaron (estado Ocupado) no se verán afectados.\n\n" +
+                    "¿Desea cerrar el periodo ahora?",
+                    "Periodo de renovación vencido",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button1);
+
+                if (dr != DialogResult.Yes) return false;
+
+                using var tran = conn.BeginTransaction();
+
+                // Desactivar asignaciones de lockers que siguen en Renovación
+                using (var cmd = new SQLiteCommand(@"
+                    UPDATE asignaciones SET activa = 0
+                    WHERE  activa = 1
+                      AND  id_locker IN (SELECT id_locker FROM lockers WHERE estado = '2');",
+                    conn, tran))
+                    cmd.ExecuteNonQuery();
+
+                // Locker en Renovación → Disponible
+                using (var cmd = new SQLiteCommand(
+                    "UPDATE lockers SET estado = '0' WHERE estado = '2';", conn, tran))
+                    cmd.ExecuteNonQuery();
+
+                // Eliminar el registro — así el label de la pantalla principal
+                // no encuentra nada y queda vacío automáticamente.
+                using (var cmd = new SQLiteCommand(
+                    "DELETE FROM Renovacion WHERE id_renovacion = @id;", conn, tran))
+                {
+                    cmd.Parameters.AddWithValue("@id", idRenovacion.Value);
+                    cmd.ExecuteNonQuery();
+                }
+
+                tran.Commit();
+
+                MessageBox.Show(
+                    "Periodo cerrado correctamente.\nLos lockers sin renovar están disponibles.",
+                    "Periodo cerrado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al cerrar el periodo: " + ex.Message,
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // Consultas de alumnos / asignaciones
+        // ─────────────────────────────────────────────
+
         public static AsignacionInfo? ObtenerAlumnoAsignadoPorLocker(int idLocker)
         {
             try
@@ -318,11 +520,9 @@ namespace Gestion_Lockers
                     JOIN   alumnos al ON a.matricula = al.matricula
                     WHERE  a.id_locker = @id AND a.activa = 1
                     LIMIT  1;";
-
                 using var cmd = new SQLiteCommand(sql, conn);
                 cmd.Parameters.AddWithValue("@id", idLocker);
                 using var reader = cmd.ExecuteReader();
-
                 if (reader.Read())
                     return new AsignacionInfo(
                         reader["nombre"]?.ToString() ?? string.Empty,
@@ -367,8 +567,7 @@ namespace Gestion_Lockers
                     "SELECT estado FROM lockers WHERE id_locker = @id LIMIT 1;", conn);
                 cmd.Parameters.AddWithValue("@id", idLocker);
                 var estado = cmd.ExecuteScalar()?.ToString() ?? string.Empty;
-                return estado.Equals("Disponible", StringComparison.OrdinalIgnoreCase)
-                    || estado == "0";
+                return estado.Equals("Disponible", StringComparison.OrdinalIgnoreCase) || estado == "0";
             }
             catch { return false; }
         }

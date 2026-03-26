@@ -66,6 +66,9 @@
             lblCasillero = new Label();
             lblMatricula = new Label();
             btnRenovar = new Button();
+            txtBusqueda = new TextBox();
+            btnBuscar = new Button();
+            btnLimpiarBusqueda = new Button();
             menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
             SuspendLayout();
@@ -90,9 +93,7 @@
             // verToolStripMenuItem
             // 
             verToolStripMenuItem.Name = "verToolStripMenuItem";
-            verToolStripMenuItem.Size = new Size(126, 34);
-            verToolStripMenuItem.Text = "Ver";
-            verToolStripMenuItem.Click += verToolStripMenuItem_Click;
+            verToolStripMenuItem.Size = new Size(73, 22);
             // 
             // alumnosToolStripMenuItem
             // 
@@ -105,8 +106,6 @@
             // 
             asignarToolStripMenuItem.Name = "asignarToolStripMenuItem";
             asignarToolStripMenuItem.Size = new Size(203, 34);
-            asignarToolStripMenuItem.Text = "Asignar";
-            asignarToolStripMenuItem.Click += asignarToolStripMenuItem_Click;
             // 
             // renovarToolStripMenuItem
             // 
@@ -233,7 +232,7 @@
             dataGridView1.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dataGridView1.Location = new Point(22, 208);
             dataGridView1.Name = "dataGridView1";
-            dataGridView1.Size = new Size(1107, 431);
+            dataGridView1.Size = new Size(1107, 276);
             dataGridView1.TabIndex = 7;
             // 
             // label2
@@ -404,6 +403,35 @@
             btnRenovar.Text = "Renovar";
             btnRenovar.UseVisualStyleBackColor = true;
             // 
+            // txtBusqueda
+            // 
+            txtBusqueda.Font = new Font("Century Gothic", 13F);
+            txtBusqueda.Location = new Point(17, 490);
+            txtBusqueda.Name = "txtBusqueda";
+            txtBusqueda.PlaceholderText = "Buscar por #locker, nombre o matrícula";
+            txtBusqueda.Size = new Size(380, 29);
+            txtBusqueda.TabIndex = 30;
+            // 
+            // btnBuscar
+            // 
+            btnBuscar.Font = new Font("Century Gothic", 12F);
+            btnBuscar.Location = new Point(17, 528);
+            btnBuscar.Name = "btnBuscar";
+            btnBuscar.Size = new Size(183, 36);
+            btnBuscar.TabIndex = 31;
+            btnBuscar.Text = "Buscar";
+            btnBuscar.UseVisualStyleBackColor = true;
+            // 
+            // btnLimpiarBusqueda
+            // 
+            btnLimpiarBusqueda.Font = new Font("Century Gothic", 12F);
+            btnLimpiarBusqueda.Location = new Point(214, 528);
+            btnLimpiarBusqueda.Name = "btnLimpiarBusqueda";
+            btnLimpiarBusqueda.Size = new Size(183, 36);
+            btnLimpiarBusqueda.TabIndex = 32;
+            btnLimpiarBusqueda.Text = "Limpiar";
+            btnLimpiarBusqueda.UseVisualStyleBackColor = true;
+            // 
             // Principal
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -433,6 +461,9 @@
             Controls.Add(lblFechaRenovacion);
             Controls.Add(label1);
             Controls.Add(menuStrip1);
+            Controls.Add(txtBusqueda);
+            Controls.Add(btnBuscar);
+            Controls.Add(btnLimpiarBusqueda);
             MainMenuStrip = menuStrip1;
             Name = "Principal";
             Text = "Bienvenido";
@@ -483,5 +514,8 @@
         private Label lblCasillero;
         private Label lblMatricula;
         private Button btnRenovar;
+        private TextBox txtBusqueda;
+        private Button  btnBuscar;
+        private Button  btnLimpiarBusqueda;
     }
 }

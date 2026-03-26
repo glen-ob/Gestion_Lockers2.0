@@ -24,7 +24,7 @@ namespace Gestion_Lockers
 
             Controls.AddRange(new Control[] { btnMapa, btnAlumnos, btnAsignar, btnRenovacion });
 
-            btnMapa.Click += (s, e) => { var f = new Mapa(); f.ShowDialog(); };
+            //btnMapa.Click += (s, e) => { var f = new Mapa(); f.ShowDialog(); };
             btnAlumnos.Click += (s, e) => { MessageBox.Show("Abrir formulario de Alumnos (implementar frmalumnos).", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information); };
             btnAsignar.Click += (s, e) => { MessageBox.Show("Abrir formulario de Asignar (implementar frmAsignar).", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information); };
             btnRenovacion.Click += (s, e) => { var f = new RenovacionFuncion(); f.ShowDialog(); };

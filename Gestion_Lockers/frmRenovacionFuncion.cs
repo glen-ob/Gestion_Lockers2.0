@@ -235,11 +235,11 @@ namespace Gestion_Lockers
                 }
 
                 // Todo OK: abrir FrmAsignacion en modo renovación precargado
-                using (var frm = new FrmAsignacion(matricula, lockerAnterior, true))
-                {
-                    frm.StartPosition = FormStartPosition.CenterParent;
-                    frm.ShowDialog(this);
-                }
+                //using (var frm = new FrmAsignacion(matricula, lockerAnterior, true))
+                //{
+                //    frm.StartPosition = FormStartPosition.CenterParent;
+                //    frm.ShowDialog(this);
+                //}
             }
             catch (Exception ex)
             {

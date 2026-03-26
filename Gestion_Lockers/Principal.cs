@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Data.SQLite;
 using System.Diagnostics;
+using System.Drawing;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
@@ -32,16 +33,22 @@ namespace Gestion_Lockers
         }
 
         // ─────────────────────────────────────────────
-        // Suscripción de eventos (una sola vez)
+        // Suscripción de eventos
         // ─────────────────────────────────────────────
 
         private void SuscribirEventos()
         {
             Load += Principal_Load;
             cbUbicacion.SelectedIndexChanged += CbUbicacion_SelectedIndexChanged;
+            cbUbicacion.DrawItem += CbUbicacion_DrawItem;
             dataGridView1.CellClick += DataGridView1_CellClick;
             btnAsignar.Click += BtnAsignar_Click;
             btnRenovar.Click += BtnRenovar_Click;
+
+            // Búsqueda: Enter en el TextBox o clic en el botón
+            txtBusqueda.KeyDown += TxtBusqueda_KeyDown;
+            btnBuscar.Click += BtnBuscar_Click;
+            btnLimpiarBusqueda.Click += BtnLimpiarBusqueda_Click;
         }
 
         // ─────────────────────────────────────────────
@@ -52,30 +59,45 @@ namespace Gestion_Lockers
         {
             lblFecha.Text = DateTime.Now.ToString("dd/MM/yyyy");
 
-            // Fecha fin de renovación más reciente
+            // Label de renovación: visible solo si hay un periodo activo vigente
             try
             {
                 using var conn = DBConnection.GetConnection();
-                using var cmd = new SQLiteCommand(
-                    "SELECT fecha_fin FROM Renovacion ORDER BY fecha_inicio DESC LIMIT 1;", conn);
+                using var cmd = new SQLiteCommand(@"
+                    SELECT fecha_fin FROM Renovacion
+                    WHERE date(fecha_fin) >= date('now')
+                    ORDER BY fecha_fin ASC LIMIT 1;", conn);
                 var obj = cmd.ExecuteScalar();
-                lblFechaRenovacion.Text =
-                    obj != null && obj != DBNull.Value && DateTime.TryParse(obj.ToString(), out DateTime ff)
-                        ? ff.ToString("dd/MM/yyyy")
-                        : "--/--/----";
+
+                if (obj != null && obj != DBNull.Value
+                    && DateTime.TryParse(obj.ToString(), out DateTime ff))
+                {
+                    lblFechaRenovacion.Text = ff.ToString("dd/MM/yyyy");
+                    lblFechaRenovacion.Visible = true;
+                    label3.Visible = true;
+                }
+                else
+                {
+                    lblFechaRenovacion.Visible = false;
+                    label3.Visible = false;
+                }
             }
             catch
             {
-                lblFechaRenovacion.Text = "--/--/----";
+                lblFechaRenovacion.Visible = false;
+                label3.Visible = false;
             }
 
-            // Configurar apariencia del grid (fuente, alto de fila, etc.)
+            // Configurar grid
             Funciones.ConfigurarGridLockers(dataGridView1);
 
-            // Cargar datos iniciales
+            // Configurar combo con owner-draw para encabezados
+            cbUbicacion.DrawMode = DrawMode.OwnerDrawFixed;
+
+            // Cargar datos
             try
             {
-                Funciones.CargarPisos(cbUbicacion);
+                Funciones.CargarZonasEnCombo(cbUbicacion);
                 Funciones.CargarEstadosDesdeBD(diccionario);
             }
             catch (Exception ex)
@@ -85,42 +107,65 @@ namespace Gestion_Lockers
             }
 
             AplicarPermisosRol();
+
+            // Verificar vencimiento de renovación (solo admin puede cerrar)
+            if (EsAdmin())
+                Funciones.VerificarYCerrarVencimiento(this);
         }
 
         // ─────────────────────────────────────────────
-        // Permisos según rol
+        // ComboBox jerárquico — dibujo y selección
         // ─────────────────────────────────────────────
 
-        private void AplicarPermisosRol()
+        private void CbUbicacion_DrawItem(object? sender, DrawItemEventArgs e)
         {
-            bool esAdmin = EsAdmin();
+            if (e.Index < 0 || e.Index >= cbUbicacion.Items.Count) return;
 
-            ingresarToolStripMenuItem1.Enabled = esAdmin;
-            eliminarToolStripMenuItem.Enabled = esAdmin;
-            periodoDeRenovacionToolStripMenuItem.Enabled = esAdmin;
-            cancelarRenovacionToolStripMenuItem.Enabled = esAdmin;
-            reportesToolStripMenuItem.Enabled = esAdmin;
-            usuariosToolStripMenuItem.Enabled = esAdmin;
-            funcionalidadesToolStripMenuItem.Enabled = esAdmin;
+            var item = cbUbicacion.Items[e.Index] as Funciones.UbicacionItem;
+            if (item == null) return;
+
+            e.DrawBackground();
+
+            if (item.EsEncabezado)
+            {
+                // Encabezado: fondo gris, texto en negrita
+                using var bgBrush = new SolidBrush(Color.FromArgb(220, 220, 220));
+                e.Graphics.FillRectangle(bgBrush, e.Bounds);
+                using var font = new Font(cbUbicacion.Font, FontStyle.Bold);
+                using var brush = new SolidBrush(Color.FromArgb(70, 70, 70));
+                e.Graphics.DrawString(item.Texto, font, brush,
+                    new Rectangle(e.Bounds.X + 4, e.Bounds.Y, e.Bounds.Width - 4, e.Bounds.Height),
+                    StringFormat.GenericDefault);
+            }
+            else
+            {
+                bool selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+                using var brush = new SolidBrush(selected
+                    ? SystemColors.HighlightText
+                    : cbUbicacion.ForeColor);
+                e.Graphics.DrawString(item.Texto, cbUbicacion.Font, brush,
+                    new Rectangle(e.Bounds.X + 4, e.Bounds.Y, e.Bounds.Width - 4, e.Bounds.Height),
+                    StringFormat.GenericDefault);
+            }
+
+            e.DrawFocusRectangle();
         }
-
-        // ─────────────────────────────────────────────
-        // Selección de piso — dibuja el mapa
-        // ─────────────────────────────────────────────
 
         private void CbUbicacion_SelectedIndexChanged(object? sender, EventArgs e)
         {
-            string texto = cbUbicacion.Text?.Trim() ?? string.Empty;
+            // Evitar que el usuario seleccione un encabezado
+            if (cbUbicacion.SelectedItem is Funciones.UbicacionItem item && item.EsEncabezado)
+            {
+                cbUbicacion.SelectedIndex = -1;
+                return;
+            }
+
+            if (cbUbicacion.SelectedItem is not Funciones.UbicacionItem sel) return;
 
             try
             {
-                // Extraer el número de piso del texto "Piso X"
-                if (texto.StartsWith("Piso ", StringComparison.OrdinalIgnoreCase)
-                    && int.TryParse(texto.Substring(5).Trim(), out int numeroPiso))
-                {
-                    Funciones.CargarEstadosDesdeBD(diccionario);
-                    Funciones.DibujarMapaPiso(dataGridView1, diccionario, numeroPiso);
-                }
+                Funciones.CargarEstadosDesdeBD(diccionario);
+                Funciones.DibujarMapaPiso(dataGridView1, diccionario, sel.Piso, sel.Zona);
             }
             catch (Exception ex)
             {
@@ -150,31 +195,128 @@ namespace Gestion_Lockers
 
             if (int.TryParse(valor, out int idLocker))
             {
-                selectedLockerId = idLocker;
-                lblCasillero.Text = idLocker.ToString();
-
-                var info = Funciones.ObtenerAlumnoAsignadoPorLocker(idLocker);
-                if (info is not null)
-                {
-                    lblNombre.Text = info.Nombre;
-                    lblMatricula.Text = info.Matricula;
-                    TXTNombre.Text = info.Nombre;
-                    txtMatricula.Text = info.Matricula;
-                    txtTelefono.Text = info.Telefono;
-                }
-                else
-                {
-                    lblNombre.Text = "Sin asignar";
-                    lblMatricula.Text = "-";
-                    LimpiarCamposAlumno();
-                }
+                MostrarInfoLocker(idLocker);
             }
             else
             {
-                // Locker alfanumérico (SA_*) — no asignable por el momento
+                // Locker alfanumérico SA_* — no asignable
                 selectedLockerId = null;
                 LimpiarLabels();
             }
+        }
+
+        /// <summary>Carga info de un locker en el panel lateral y lo marca como seleccionado.</summary>
+        private void MostrarInfoLocker(int idLocker)
+        {
+            selectedLockerId = idLocker;
+            lblCasillero.Text = idLocker.ToString();
+
+            var info = Funciones.ObtenerAlumnoAsignadoPorLocker(idLocker);
+            if (info is not null)
+            {
+                lblNombre.Text = info.Nombre;
+                lblMatricula.Text = info.Matricula;
+                TXTNombre.Text = info.Nombre;
+                txtMatricula.Text = info.Matricula;
+                txtTelefono.Text = info.Telefono;
+            }
+            else
+            {
+                lblNombre.Text = "Sin asignar";
+                lblMatricula.Text = "-";
+                LimpiarCamposAlumno();
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // Búsqueda en panel lateral
+        // ─────────────────────────────────────────────
+
+        private void TxtBusqueda_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.SuppressKeyPress = true;
+                EjecutarBusqueda();
+            }
+        }
+
+        private void BtnBuscar_Click(object? sender, EventArgs e)
+            => EjecutarBusqueda();
+
+        private void BtnLimpiarBusqueda_Click(object? sender, EventArgs e)
+        {
+            txtBusqueda.Clear();
+            selectedLockerId = null;
+            LimpiarLabels();
+            LimpiarCamposAlumno();
+            DesaltarCeldas();
+        }
+
+        private void EjecutarBusqueda()
+        {
+            string termino = txtBusqueda.Text.Trim();
+            if (string.IsNullOrEmpty(termino)) return;
+
+            var resultado = Funciones.BuscarLocker(termino);
+            if (resultado == null) return;
+
+            // Mostrar datos en panel lateral
+            MostrarInfoLocker(resultado.IdLocker);
+
+            // Resaltar la celda en el grid si es visible en el piso actual
+            ResaltarLockerEnGrid(resultado.IdLocker);
+        }
+
+        /// <summary>
+        /// Resalta visualmente la celda del locker encontrado si está en el grid actual.
+        /// Si el piso del locker no está cargado, cambia el combo automáticamente.
+        /// </summary>
+        private void ResaltarLockerEnGrid(int idLocker)
+        {
+            // Intentar encontrar la celda en el grid ya dibujado
+            foreach (DataGridViewRow row in dataGridView1.Rows)
+            {
+                foreach (DataGridViewCell cell in row.Cells)
+                {
+                    if (cell.Value?.ToString() == idLocker.ToString())
+                    {
+                        // Limpiar selección previa y resaltar esta
+                        DesaltarCeldas();
+                        dataGridView1.CurrentCell = cell;
+                        cell.Style.BackColor = Color.Orange;
+                        cell.Style.ForeColor = Color.White;
+                        dataGridView1.FirstDisplayedScrollingColumnIndex =
+                            Math.Max(0, cell.ColumnIndex - 5);
+                        return;
+                    }
+                }
+            }
+
+            // No está en el grid actual — cambiar al piso correspondiente
+            int piso = idLocker / 1000;
+            for (int i = 0; i < cbUbicacion.Items.Count; i++)
+            {
+                if (cbUbicacion.Items[i] is Funciones.UbicacionItem it
+                    && it.Piso == piso && !it.EsEncabezado && string.IsNullOrEmpty(it.Zona))
+                {
+                    cbUbicacion.SelectedIndex = i;
+                    // Después del redibujo, volver a resaltar
+                    ResaltarLockerEnGrid(idLocker);
+                    return;
+                }
+            }
+        }
+
+        /// <summary>Quita el color naranja de búsqueda y restaura el color de estado.</summary>
+        private void DesaltarCeldas()
+        {
+            ApplyEstadosEnGrid();
+        }
+
+        private void ApplyEstadosEnGrid()
+        {
+            Funciones.ApplyEstadosEnGrid(dataGridView1, diccionario);
         }
 
         // ─────────────────────────────────────────────
@@ -187,7 +329,6 @@ namespace Gestion_Lockers
             string telefono = txtTelefono.Text.Trim();
             string matricula = txtMatricula.Text.Trim();
 
-            // Validaciones de campos
             if (string.IsNullOrEmpty(nombre) || string.IsNullOrEmpty(matricula) || string.IsNullOrEmpty(telefono))
             {
                 MessageBox.Show("Todos los campos (Nombre, Matrícula, Teléfono) son obligatorios.",
@@ -211,7 +352,7 @@ namespace Gestion_Lockers
 
             if (!selectedLockerId.HasValue)
             {
-                MessageBox.Show("Seleccione un casillero en el mapa antes de asignar.",
+                MessageBox.Show("Seleccione un casillero en el mapa o búsquelo antes de asignar.",
                     "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -226,13 +367,11 @@ namespace Gestion_Lockers
             bool grupoAcademico = rbGrupoAcademico?.Checked ?? false;
             bool grupoCultural = rbGrupoCultural?.Checked ?? false;
 
-            // Grupos especiales requieren administrador
             if ((grupoAcademico || grupoCultural) && !EsAdmin())
             {
                 var dr = MessageBox.Show(
                     "Para asignar grupos académico/cultural se requiere inicio de sesión de administrador. ¿Desea continuar?",
                     "Requiere administrador", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
                 if (dr != DialogResult.Yes) return;
 
                 using var login = new frm_Inicio();
@@ -243,7 +382,6 @@ namespace Gestion_Lockers
                         "Permiso denegado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
-
                 currentUserId = login.UserId;
                 currentUserRole = login.UserRole;
             }
@@ -255,7 +393,6 @@ namespace Gestion_Lockers
                 return;
             }
 
-            // Persistir asignación
             try
             {
                 using var conn = DBConnection.GetConnection();
@@ -267,9 +404,8 @@ namespace Gestion_Lockers
                 if (Funciones.ExisteAlumno(matricula, conn))
                 {
                     using var upd = new SQLiteCommand(@"
-                        UPDATE alumnos
-                        SET nombre=@nombre, telefono=@telefono,
-                            grupo_academico=@gAcad, grupo_cultural=@gCult
+                        UPDATE alumnos SET nombre=@nombre, telefono=@telefono,
+                               grupo_academico=@gAcad, grupo_cultural=@gCult
                         WHERE matricula=@mat;", conn, tran);
                     upd.Parameters.AddWithValue("@nombre", nombre);
                     upd.Parameters.AddWithValue("@telefono", telefono);
@@ -319,17 +455,18 @@ namespace Gestion_Lockers
             RefrescarMapa();
             LimpiarCamposAlumno();
             LimpiarLabels();
+            txtBusqueda.Clear();
         }
 
         // ─────────────────────────────────────────────
-        // Renovar locker seleccionado
+        // Renovar
         // ─────────────────────────────────────────────
 
         private void BtnRenovar_Click(object? sender, EventArgs e)
         {
             if (!selectedLockerId.HasValue)
             {
-                MessageBox.Show("Seleccione un casillero en el mapa para renovar.",
+                MessageBox.Show("Seleccione o busque un casillero para renovar.",
                     "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -354,17 +491,8 @@ namespace Gestion_Lockers
 
         //private void verToolStripMenuItem_Click(object sender, EventArgs e)
         //{
-        //    try
-        //    {
-        //        var mapa = new Mapa();
-        //        mapa.StartPosition = FormStartPosition.CenterParent;
-        //        mapa.ShowDialog(this);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        MessageBox.Show($"No se pudo abrir el mapa: {ex.Message}",
-        //            "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        //    }
+        //    try { var m = new Mapa(); m.StartPosition = FormStartPosition.CenterParent; m.ShowDialog(this); }
+        //    catch (Exception ex) { MostrarErrorFormulario(ex); }
         //}
 
         // ─────────────────────────────────────────────
@@ -424,33 +552,27 @@ namespace Gestion_Lockers
 
                 if (!lastId.HasValue)
                 {
-                    MessageBox.Show("No existe ningún periodo de renovación para cancelar.",
+                    MessageBox.Show("No existe ningún periodo para cancelar.",
                         "Información", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
                 using (var del = new SQLiteCommand(
                     "DELETE FROM Renovacion WHERE id_renovacion = @id;", conn, tran))
-                {
-                    del.Parameters.AddWithValue("@id", lastId.Value);
-                    del.ExecuteNonQuery();
-                }
+                { del.Parameters.AddWithValue("@id", lastId.Value); del.ExecuteNonQuery(); }
 
-                using (var updOcc = new SQLiteCommand(
+                using (var u1 = new SQLiteCommand(
                     "UPDATE lockers SET estado = '1' WHERE id_locker IN (SELECT id_locker FROM asignaciones WHERE activa = 1);",
-                    conn, tran))
-                    updOcc.ExecuteNonQuery();
+                    conn, tran)) u1.ExecuteNonQuery();
 
-                using (var updFree = new SQLiteCommand(
+                using (var u2 = new SQLiteCommand(
                     "UPDATE lockers SET estado = '0' WHERE estado = '2' AND id_locker NOT IN (SELECT id_locker FROM asignaciones WHERE activa = 1);",
-                    conn, tran))
-                    updFree.ExecuteNonQuery();
+                    conn, tran)) u2.ExecuteNonQuery();
 
                 tran.Commit();
 
                 MessageBox.Show("Renovación cancelada y estados revertidos.", "Éxito",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
-
                 RefrescarMapa();
             }
             catch (Exception ex)
@@ -467,33 +589,24 @@ namespace Gestion_Lockers
                 using var conn = DBConnection.GetConnection();
                 using var cmd = new SQLiteCommand("SELECT * FROM asignaciones;", conn);
                 using var reader = cmd.ExecuteReader();
-
                 var sb = new System.Text.StringBuilder();
 
                 for (int i = 0; i < reader.FieldCount; i++)
-                {
-                    if (i > 0) sb.Append(',');
-                    sb.Append(EscapeCsv(reader.GetName(i)));
-                }
+                { if (i > 0) sb.Append(','); sb.Append(EscapeCsv(reader.GetName(i))); }
                 sb.AppendLine();
 
                 while (reader.Read())
                 {
                     for (int i = 0; i < reader.FieldCount; i++)
-                    {
-                        if (i > 0) sb.Append(',');
-                        sb.Append(EscapeCsv(reader.IsDBNull(i) ? string.Empty : reader.GetValue(i).ToString()));
-                    }
+                    { if (i > 0) sb.Append(','); sb.Append(EscapeCsv(reader.IsDBNull(i) ? "" : reader.GetValue(i).ToString())); }
                     sb.AppendLine();
                 }
 
                 string path = System.IO.Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
                     $"asignaciones_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-
                 System.IO.File.WriteAllText(path, sb.ToString(), System.Text.Encoding.UTF8);
                 Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
-
                 MessageBox.Show($"Reporte exportado:\n{path}", "Exportado",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -511,6 +624,18 @@ namespace Gestion_Lockers
         private bool EsAdmin()
             => !string.IsNullOrEmpty(currentUserRole)
                && currentUserRole.Equals("Administrador", StringComparison.OrdinalIgnoreCase);
+
+        private void AplicarPermisosRol()
+        {
+            bool esAdmin = EsAdmin();
+            ingresarToolStripMenuItem1.Enabled = esAdmin;
+            eliminarToolStripMenuItem.Enabled = esAdmin;
+            periodoDeRenovacionToolStripMenuItem.Enabled = esAdmin;
+            cancelarRenovacionToolStripMenuItem.Enabled = esAdmin;
+            reportesToolStripMenuItem.Enabled = esAdmin;
+            usuariosToolStripMenuItem.Enabled = esAdmin;
+            funcionalidadesToolStripMenuItem.Enabled = esAdmin;
+        }
 
         private void RefrescarMapa()
         {
@@ -538,7 +663,6 @@ namespace Gestion_Lockers
             lblCasillero.Text = "----";
         }
 
-        /// <summary>Abre un Form centrado en el padre con manejo de errores estándar.</summary>
         private void AbrirFormulario<T>(Func<T> factory) where T : Form
         {
             try
@@ -548,21 +672,19 @@ namespace Gestion_Lockers
                 frm.ShowDialog(this);
                 RefrescarMapa();
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"No se pudo abrir el formulario: {ex.Message}",
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            catch (Exception ex) { MostrarErrorFormulario(ex); }
         }
+
+        private static void MostrarErrorFormulario(Exception ex)
+            => MessageBox.Show($"No se pudo abrir el formulario: {ex.Message}",
+                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
         private static string EscapeCsv(string? value)
         {
             if (string.IsNullOrEmpty(value)) return string.Empty;
-            string escaped = value.Replace("\"", "\"\"");
-            return (escaped.Contains(',') || escaped.Contains('"')
-                    || escaped.Contains('\n') || escaped.Contains('\r'))
-                ? $"\"{escaped}\""
-                : escaped;
+            string esc = value.Replace("\"", "\"\"");
+            return (esc.Contains(',') || esc.Contains('"') || esc.Contains('\n') || esc.Contains('\r'))
+                ? $"\"{esc}\"" : esc;
         }
     }
 }
