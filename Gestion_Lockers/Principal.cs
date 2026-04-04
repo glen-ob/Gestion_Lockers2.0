@@ -99,6 +99,8 @@ namespace Gestion_Lockers
             {
                 Funciones.CargarZonasEnCombo(cbUbicacion);
                 Funciones.CargarEstadosDesdeBD(diccionario);
+                CargarComboPrecio();
+                CargarComboCarrera();
             }
             catch (Exception ex)
             {
@@ -398,6 +400,18 @@ namespace Gestion_Lockers
                 return;
             }
 
+            // Precio seleccionado
+            var precioSel = cbPrecio.SelectedItem as Funciones.PrecioItem;
+            if (precioSel == null)
+            {
+                MessageBox.Show("Seleccione un precio antes de asignar.",
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Carrera seleccionada (opcional)
+            var carreraSel = cbCarrera.SelectedItem as Funciones.CarreraItem;
+
             bool grupoAcademico = rbGrupoAcademico?.Checked ?? false;
             bool grupoCultural = rbGrupoCultural?.Checked ?? false;
 
@@ -439,38 +453,42 @@ namespace Gestion_Lockers
                 {
                     using var upd = new SQLiteCommand(@"
                         UPDATE alumnos SET nombre=@nombre, telefono=@telefono,
-                               grupo_academico=@gAcad, grupo_cultural=@gCult
+                               grupo_academico=@gAcad, grupo_cultural=@gCult,
+                               id_carrera=@carrera
                         WHERE matricula=@mat;", conn, tran);
                     upd.Parameters.AddWithValue("@nombre", nombre);
                     upd.Parameters.AddWithValue("@telefono", telefono);
                     upd.Parameters.AddWithValue("@gAcad", gAcad ? 1 : 0);
                     upd.Parameters.AddWithValue("@gCult", gCult ? 1 : 0);
+                    upd.Parameters.AddWithValue("@carrera", carreraSel != null ? (object)carreraSel.IdCarrera : DBNull.Value);
                     upd.Parameters.AddWithValue("@mat", matricula);
                     upd.ExecuteNonQuery();
                 }
                 else
                 {
                     using var ins = new SQLiteCommand(@"
-                        INSERT INTO alumnos (matricula, nombre, telefono, grupo_academico, grupo_cultural)
-                        VALUES (@mat, @nombre, @telefono, @gAcad, @gCult);", conn, tran);
+                        INSERT INTO alumnos (matricula, nombre, telefono, grupo_academico, grupo_cultural, id_carrera)
+                        VALUES (@mat, @nombre, @telefono, @gAcad, @gCult, @carrera);", conn, tran);
                     ins.Parameters.AddWithValue("@mat", matricula);
                     ins.Parameters.AddWithValue("@nombre", nombre);
                     ins.Parameters.AddWithValue("@telefono", telefono);
                     ins.Parameters.AddWithValue("@gAcad", gAcad ? 1 : 0);
                     ins.Parameters.AddWithValue("@gCult", gCult ? 1 : 0);
+                    ins.Parameters.AddWithValue("@carrera", carreraSel != null ? (object)carreraSel.IdCarrera : DBNull.Value);
                     ins.ExecuteNonQuery();
                 }
 
                 using var insAsig = new SQLiteCommand(@"
-                    INSERT INTO asignaciones (matricula, id_locker, fecha_inicio, fecha_fin, activa)
-                    VALUES (@mat, @id, @fecha, NULL, 1);", conn, tran);
+                    INSERT INTO asignaciones (matricula, id_locker, fecha_inicio, fecha_fin, activa, id_precio, monto_pagado)
+                    VALUES (@mat, @id, date('now'), NULL, 1, @precio, @monto);", conn, tran);
                 insAsig.Parameters.AddWithValue("@mat", matricula);
                 insAsig.Parameters.AddWithValue("@id", selectedLockerId.Value);
-                insAsig.Parameters.AddWithValue("@fecha", DateTime.UtcNow.ToString("o"));
+                insAsig.Parameters.AddWithValue("@precio", precioSel.IdPrecio);
+                insAsig.Parameters.AddWithValue("@monto", (double)precioSel.Monto);
                 insAsig.ExecuteNonQuery();
 
                 using var updLocker = new SQLiteCommand(
-                    "UPDATE lockers SET estado = '1' WHERE id_locker = @id;", conn, tran);
+                    "UPDATE lockers SET estado = 'Ocupado' WHERE id_locker = @id;", conn, tran);
                 updLocker.Parameters.AddWithValue("@id", selectedLockerId.Value);
                 updLocker.ExecuteNonQuery();
 
@@ -640,6 +658,9 @@ namespace Gestion_Lockers
 
         private void funcionalidadesToolStripMenuItem_Click(object sender, EventArgs e) { }
 
+        private void preciosToolStripMenuItem_Click(object sender, EventArgs e)
+            => AbrirFormulario(() => new frmGestionPrecios());
+
         private void periodoDeRenovacionToolStripMenuItem_Click(object sender, EventArgs e)
             => AbrirFormulario(() => new frmPeriodoRenovacion());
 
@@ -699,26 +720,11 @@ namespace Gestion_Lockers
         {
             try
             {
-                using var conn = DBConnection.GetConnection();
-                using var cmd = new SQLiteCommand("SELECT * FROM asignaciones;", conn);
-                using var reader = cmd.ExecuteReader();
-                var sb = new System.Text.StringBuilder();
-
-                for (int i = 0; i < reader.FieldCount; i++)
-                { if (i > 0) sb.Append(','); sb.Append(EscapeCsv(reader.GetName(i))); }
-                sb.AppendLine();
-
-                while (reader.Read())
-                {
-                    for (int i = 0; i < reader.FieldCount; i++)
-                    { if (i > 0) sb.Append(','); sb.Append(EscapeCsv(reader.IsDBNull(i) ? "" : reader.GetValue(i).ToString())); }
-                    sb.AppendLine();
-                }
-
+                string csv = Funciones.GenerarReporteCSV();
                 string path = System.IO.Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    $"asignaciones_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-                System.IO.File.WriteAllText(path, sb.ToString(), System.Text.Encoding.UTF8);
+                    $"reporte_lockers_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                System.IO.File.WriteAllText(path, csv, System.Text.Encoding.UTF8);
                 Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
                 MessageBox.Show($"Reporte exportado:\n{path}", "Exportado",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -733,6 +739,27 @@ namespace Gestion_Lockers
         // ─────────────────────────────────────────────
         // Helpers privados
         // ─────────────────────────────────────────────
+
+        // ─────────────────────────────────────────────
+        // Cargar combos de precio y carrera
+        // ─────────────────────────────────────────────
+
+        private void CargarComboPrecio()
+        {
+            cbPrecio.Items.Clear();
+            foreach (var p in Funciones.CargarPrecios())
+                cbPrecio.Items.Add(p);
+            if (cbPrecio.Items.Count > 0) cbPrecio.SelectedIndex = 0;
+        }
+
+        private void CargarComboCarrera()
+        {
+            cbCarrera.Items.Clear();
+            cbCarrera.Items.Add("— Sin especificar —");
+            foreach (var c in Funciones.CargarCarreras())
+                cbCarrera.Items.Add(c);
+            cbCarrera.SelectedIndex = 0;
+        }
 
         private bool EsAdmin()
             => !string.IsNullOrEmpty(currentUserRole)
@@ -798,6 +825,11 @@ namespace Gestion_Lockers
             string esc = value.Replace("\"", "\"\"");
             return (esc.Contains(',') || esc.Contains('"') || esc.Contains('\n') || esc.Contains('\r'))
                 ? $"\"{esc}\"" : esc;
+        }
+
+        private void Principal_Load_1(object sender, EventArgs e)
+        {
+
         }
     }
 }

@@ -24,6 +24,16 @@ namespace Gestion_Lockers
             string Matricula,
             string Telefono);
 
+        internal record PrecioItem(int IdPrecio, string Nombre, decimal Monto)
+        {
+            public override string ToString() => $"{Nombre}  (${Monto:0.00})";
+        }
+
+        internal record CarreraItem(int IdCarrera, string Nombre)
+        {
+            public override string ToString() => Nombre;
+        }
+
         // ─────────────────────────────────────────────
         // Configuración visual del DataGridView
         // ─────────────────────────────────────────────
@@ -176,17 +186,30 @@ namespace Gestion_Lockers
             if (numericos.Count == 0 && alfanumericos.Count == 0) return;
 
             int totalFilas = numericos.Count;
-            int minColumna = int.MaxValue;
-            int maxColumna = 0;
-            foreach (var fila in numericos.Values)
-                foreach (int col in fila)
-                {
-                    if (col < minColumna) minColumna = col;
-                    if (col > maxColumna) maxColumna = col;
-                }
+            int minColumna = 0;
+            int totalCols = 0;
 
-            // Número real de columnas del bloque (ej. Bloque 2: 21-40 → 20 columnas)
-            int totalCols = maxColumna - minColumna + 1;
+            // Validación agregada: Si hay elementos numéricos, se calcula en función a ellos.
+            if (totalFilas > 0)
+            {
+                minColumna = int.MaxValue;
+                int maxColumna = 0;
+                foreach (var fila in numericos.Values)
+                {
+                    foreach (int col in fila)
+                    {
+                        if (col < minColumna) minColumna = col;
+                        if (col > maxColumna) maxColumna = col;
+                    }
+                }
+                totalCols = maxColumna - minColumna + 1;
+            }
+            else
+            {
+                // Si solo hay elementos alfanuméricos, necesitamos por lo menos 1 fila base y 0 cols.
+                totalFilas = 1;
+            }
+
             int colWidth = totalCols <= 60 ? 52 : 44;
 
             grid.SuspendLayout();
@@ -200,7 +223,11 @@ namespace Gestion_Lockers
                 grid.Columns[c].Width = colWidth;
             }
 
-            grid.Rows.Add(totalFilas);
+            // DataGridView arroja ArgumentOutOfRangeException si agregas 0 filas
+            if (totalFilas > 0)
+            {
+                grid.Rows.Add(totalFilas);
+            }
             grid.RowHeadersVisible = false;
 
             int rowIdx = 0;
@@ -698,5 +725,193 @@ namespace Gestion_Lockers
             foreach (byte b in hash) sb.AppendFormat("{0:x2}", b);
             return sb.ToString();
         }
+
+        // ─────────────────────────────────────────────
+        // Precios
+        // ─────────────────────────────────────────────
+
+        public static List<PrecioItem> CargarPrecios()
+        {
+            var lista = new List<PrecioItem>();
+            try
+            {
+                using var conn = DBConnection.GetConnection();
+                using var cmd = new SQLiteCommand(
+                    "SELECT id_precio, nombre, monto FROM precios WHERE activo = 1 ORDER BY monto ASC;", conn);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                    lista.Add(new PrecioItem(
+                        Convert.ToInt32(r["id_precio"]),
+                        r["nombre"]?.ToString() ?? string.Empty,
+                        Convert.ToDecimal(r["monto"])));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error cargando precios: " + ex.Message,
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            return lista;
+        }
+
+        public static void GuardarPrecio(string nombre, decimal monto, string descripcion, int? idExistente = null)
+        {
+            using var conn = DBConnection.GetConnection();
+            if (idExistente.HasValue)
+            {
+                using var cmd = new SQLiteCommand(
+                    "UPDATE precios SET nombre=@n, monto=@m, descripcion=@d WHERE id_precio=@id;", conn);
+                cmd.Parameters.AddWithValue("@n", nombre);
+                cmd.Parameters.AddWithValue("@m", monto);
+                cmd.Parameters.AddWithValue("@d", descripcion);
+                cmd.Parameters.AddWithValue("@id", idExistente.Value);
+                cmd.ExecuteNonQuery();
+            }
+            else
+            {
+                using var cmd = new SQLiteCommand(
+                    "INSERT INTO precios (nombre, monto, descripcion, activo) VALUES (@n, @m, @d, 1);", conn);
+                cmd.Parameters.AddWithValue("@n", nombre);
+                cmd.Parameters.AddWithValue("@m", monto);
+                cmd.Parameters.AddWithValue("@d", descripcion);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        public static void TogglePrecioActivo(int idPrecio, bool activo)
+        {
+            using var conn = DBConnection.GetConnection();
+            using var cmd = new SQLiteCommand(
+                "UPDATE precios SET activo = @a WHERE id_precio = @id;", conn);
+            cmd.Parameters.AddWithValue("@a", activo ? 1 : 0);
+            cmd.Parameters.AddWithValue("@id", idPrecio);
+            cmd.ExecuteNonQuery();
+        }
+
+        // ─────────────────────────────────────────────
+        // Carreras
+        // ─────────────────────────────────────────────
+
+        public static List<CarreraItem> CargarCarreras()
+        {
+            var lista = new List<CarreraItem>();
+            try
+            {
+                using var conn = DBConnection.GetConnection();
+                using var cmd = new SQLiteCommand(
+                    "SELECT id_carrera, nombre FROM carreras WHERE activa = 1 ORDER BY nombre ASC;", conn);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                    lista.Add(new CarreraItem(
+                        Convert.ToInt32(r["id_carrera"]),
+                        r["nombre"]?.ToString() ?? string.Empty));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error cargando carreras: " + ex.Message,
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            return lista;
+        }
+
+        public static void AgregarCarrera(string nombre)
+        {
+            using var conn = DBConnection.GetConnection();
+            using var cmd = new SQLiteCommand(
+                "INSERT OR IGNORE INTO carreras (nombre, activa) VALUES (@n, 1);", conn);
+            cmd.Parameters.AddWithValue("@n", nombre.Trim().ToUpper());
+            cmd.ExecuteNonQuery();
+        }
+
+        // ─────────────────────────────────────────────
+        // Actualizar alumno con carrera
+        // ─────────────────────────────────────────────
+
+        public static void ActualizarCarreraAlumno(string matricula, int idCarrera)
+        {
+            using var conn = DBConnection.GetConnection();
+            using var cmd = new SQLiteCommand(
+                "UPDATE alumnos SET id_carrera = @c WHERE matricula = @m;", conn);
+            cmd.Parameters.AddWithValue("@c", idCarrera);
+            cmd.Parameters.AddWithValue("@m", matricula);
+            cmd.ExecuteNonQuery();
+        }
+
+        // ─────────────────────────────────────────────
+        // Reporte CSV ampliado
+        // ─────────────────────────────────────────────
+
+        public static string GenerarReporteCSV()
+        {
+            var sb = new StringBuilder();
+
+            // Encabezados
+            sb.AppendLine("Locker,Piso,Zona,Nombre,Matricula,Telefono,Carrera,Fecha Asignacion,Fecha Ultima Renovacion,Periodos Renovados,Precio,Monto Pagado,Total Acumulado");
+
+            using var conn = DBConnection.GetConnection();
+            const string sql = @"
+                SELECT
+                    a.id_locker,
+                    l.piso,
+                    l.zona,
+                    al.nombre,
+                    al.matricula,
+                    al.telefono,
+                    COALESCE(c.nombre, '') AS carrera,
+                    a.fecha_inicio,
+                    (SELECT MAX(a2.fecha_inicio)
+                     FROM asignaciones a2
+                     WHERE a2.matricula = a.matricula
+                       AND a2.id_locker = a.id_locker
+                       AND a2.activa = 0) AS ultima_renovacion,
+                    (SELECT COUNT(*)
+                     FROM asignaciones a3
+                     WHERE a3.matricula = a.matricula
+                       AND a3.activa = 0) AS periodos_renovados,
+                    COALESCE(p.nombre, '') AS precio_nombre,
+                    COALESCE(a.monto_pagado, 0) AS monto_pagado,
+                    (SELECT COALESCE(SUM(a4.monto_pagado), 0)
+                     FROM asignaciones a4
+                     WHERE a4.matricula = a.matricula) AS total_acumulado
+                FROM asignaciones a
+                JOIN alumnos al ON a.matricula = al.matricula
+                JOIN lockers  l  ON a.id_locker = l.id_locker
+                LEFT JOIN carreras c ON al.id_carrera = c.id_carrera
+                LEFT JOIN precios  p ON a.id_precio   = p.id_precio
+                WHERE a.activa = 1
+                ORDER BY l.piso, l.zona, CAST(a.id_locker AS INTEGER);";
+
+            using var cmd = new SQLiteCommand(sql, conn);
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                sb.AppendLine(string.Join(",",
+                    EscapeCsv(reader["id_locker"]?.ToString()),
+                    EscapeCsv(reader["piso"]?.ToString()),
+                    EscapeCsv(reader["zona"]?.ToString()),
+                    EscapeCsv(reader["nombre"]?.ToString()),
+                    EscapeCsv(reader["matricula"]?.ToString()),
+                    EscapeCsv(reader["telefono"]?.ToString()),
+                    EscapeCsv(reader["carrera"]?.ToString()),
+                    EscapeCsv(reader["fecha_inicio"]?.ToString()),
+                    EscapeCsv(reader["ultima_renovacion"]?.ToString()),
+                    EscapeCsv(reader["periodos_renovados"]?.ToString()),
+                    EscapeCsv(reader["precio_nombre"]?.ToString()),
+                    EscapeCsv(reader["monto_pagado"]?.ToString()),
+                    EscapeCsv(reader["total_acumulado"]?.ToString())
+                ));
+            }
+
+            return sb.ToString();
+        }
+
+        private static string EscapeCsv(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            string esc = value.Replace("\"", "\"\"");
+            return (esc.Contains(',') || esc.Contains('"') || esc.Contains('\n') || esc.Contains('\r'))
+                ? $"\"{esc}\"" : esc;
+        }
+
     }
 }
