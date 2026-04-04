@@ -537,6 +537,101 @@ namespace Gestion_Lockers
             return null;
         }
 
+        /// <summary>
+        /// Devuelve la matrícula del alumno con asignación activa en ese locker, o null.
+        /// Funciona tanto con lockers numéricos como alfanuméricos (SA_*).
+        /// </summary>
+        public static string? ObtenerMatriculaPorLocker(string idLocker)
+        {
+            try
+            {
+                using var conn = DBConnection.GetConnection();
+                using var cmd = new SQLiteCommand(
+                    "SELECT matricula FROM asignaciones WHERE id_locker = @id AND activa = 1 LIMIT 1;", conn);
+                cmd.Parameters.AddWithValue("@id", idLocker);
+                return cmd.ExecuteScalar()?.ToString();
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Devuelve el id_locker actual activo de un alumno, o null si no tiene.
+        /// Devuelve el valor como string para soportar IDs alfanuméricos.
+        /// </summary>
+        public static string? ObtenerLockerActivoPorMatricula(string matricula)
+        {
+            try
+            {
+                using var conn = DBConnection.GetConnection();
+                using var cmd = new SQLiteCommand(
+                    "SELECT id_locker FROM asignaciones WHERE matricula = @mat AND activa = 1 LIMIT 1;", conn);
+                cmd.Parameters.AddWithValue("@mat", matricula);
+                return cmd.ExecuteScalar()?.ToString();
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Ejecuta la renovación: cierra la asignación anterior y abre una nueva
+        /// en el locker destino (puede ser el mismo u otro distinto).
+        /// Actualiza el estado de ambos lockers si cambian.
+        /// </summary>
+        public static bool EjecutarRenovacion(string matricula, string lockerAnterior, int lockerNuevo)
+        {
+            try
+            {
+                using var conn = DBConnection.GetConnection();
+                using var tran = conn.BeginTransaction();
+
+                // Cerrar asignación anterior
+                using (var cmd = new SQLiteCommand(@"
+                    UPDATE asignaciones SET activa = 0, fecha_fin = date('now')
+                    WHERE  matricula = @mat AND id_locker = @lockerViejo AND activa = 1;",
+                    conn, tran))
+                {
+                    cmd.Parameters.AddWithValue("@mat", matricula);
+                    cmd.Parameters.AddWithValue("@lockerViejo", lockerAnterior);
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Si cambió de locker, liberar el anterior
+                if (lockerAnterior != lockerNuevo.ToString())
+                {
+                    using var liberar = new SQLiteCommand(
+                        "UPDATE lockers SET estado = 'Disponible' WHERE id_locker = @id;", conn, tran);
+                    liberar.Parameters.AddWithValue("@id", lockerAnterior);
+                    liberar.ExecuteNonQuery();
+                }
+
+                // Crear nueva asignación en el locker nuevo
+                using (var ins = new SQLiteCommand(@"
+                    INSERT INTO asignaciones (matricula, id_locker, fecha_inicio, fecha_fin, activa)
+                    VALUES (@mat, @locker, date('now'), NULL, 1);", conn, tran))
+                {
+                    ins.Parameters.AddWithValue("@mat", matricula);
+                    ins.Parameters.AddWithValue("@locker", lockerNuevo);
+                    ins.ExecuteNonQuery();
+                }
+
+                // Marcar locker nuevo como Ocupado
+                using (var upd = new SQLiteCommand(
+                    "UPDATE lockers SET estado = 'Ocupado' WHERE id_locker = @id;", conn, tran))
+                {
+                    upd.Parameters.AddWithValue("@id", lockerNuevo);
+                    upd.ExecuteNonQuery();
+                }
+
+                tran.Commit();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al renovar: " + ex.Message,
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+        }
+
         public static bool ExisteAlumno(string matricula, SQLiteConnection conn)
         {
             using var cmd = new SQLiteCommand(

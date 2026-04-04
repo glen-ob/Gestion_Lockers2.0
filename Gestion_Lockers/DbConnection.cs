@@ -8,7 +8,7 @@ using System.Data.SQLite;
 
 public class DBConnection
 {
-    private static string ruta = "Data Source=D:\\LockersDB\\LockersV1.0.db;Version=3;";
+    private static string ruta = "Data Source=D:\\LockersDB\\LockersDBPG.db;Version=3;";
 
     public static SQLiteConnection GetConnection()
     {

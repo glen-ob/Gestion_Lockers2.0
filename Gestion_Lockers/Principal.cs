@@ -188,21 +188,55 @@ namespace Gestion_Lockers
             var valor = dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
             if (string.IsNullOrWhiteSpace(valor))
             {
+                if (_modoSeleccionRenovacion) return; // ignorar clics en celdas vacías durante selección
                 selectedLockerId = null;
                 LimpiarLabels();
                 return;
             }
 
-            if (int.TryParse(valor, out int idLocker))
-            {
-                MostrarInfoLocker(idLocker);
-            }
-            else
+            if (!int.TryParse(valor, out int idLocker))
             {
                 // Locker alfanumérico SA_* — no asignable
                 selectedLockerId = null;
                 LimpiarLabels();
+                return;
             }
+
+            // ── Modo selección de locker para renovación ────────────────────
+            if (_modoSeleccionRenovacion)
+            {
+                // Verificar que el locker seleccionado esté disponible
+                if (!Funciones.EsLockerDisponible(idLocker))
+                {
+                    MessageBox.Show("Solo puede elegir un locker disponible (verde).\nEse locker no está disponible.",
+                        "No disponible", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Confirmar la reasignación
+                var confirm = MessageBox.Show(
+                    $"¿Reasignar a  {_matriculaEnRenovacion}  al locker {idLocker}?",
+                    "Confirmar cambio de locker", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                if (confirm == DialogResult.Yes)
+                {
+                    if (Funciones.EjecutarRenovacion(_matriculaEnRenovacion!, _lockerAnteriorRenovacion!, idLocker))
+                    {
+                        MessageBox.Show("Renovación con cambio de locker realizada correctamente.", "Éxito",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        CancelarModoRenovacion();
+                        RefrescarMapa();
+                        LimpiarLabels();
+                        LimpiarCamposAlumno();
+                        txtBusqueda.Clear();
+                    }
+                }
+                // Si cancela la confirmación se mantiene el modo activo para elegir otro
+                return;
+            }
+
+            // ── Flujo normal ────────────────────────────────────────────────
+            MostrarInfoLocker(idLocker);
         }
 
         /// <summary>Carga info de un locker en el panel lateral y lo marca como seleccionado.</summary>
@@ -459,30 +493,109 @@ namespace Gestion_Lockers
         }
 
         // ─────────────────────────────────────────────
-        // Renovar
+        // Renovar — flujo completo en ventana principal
         // ─────────────────────────────────────────────
+
+        // Bandera que indica que el siguiente clic en el mapa es para elegir locker de renovación
+        private bool _modoSeleccionRenovacion = false;
+        private string? _matriculaEnRenovacion = null;
+        private string? _lockerAnteriorRenovacion = null;
 
         private void BtnRenovar_Click(object? sender, EventArgs e)
         {
+            // Si está en modo selección, este clic cancela
+            if (_modoSeleccionRenovacion)
+            {
+                CancelarModoRenovacion();
+                return;
+            }
+
+            // ── Paso 1: necesitamos un locker seleccionado ──────────────────
             if (!selectedLockerId.HasValue)
             {
-                MessageBox.Show("Seleccione o busque un casillero para renovar.",
+                MessageBox.Show("Busque o seleccione el locker del alumno que desea renovar.",
                     "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            try
+            // ── Paso 2: verificar que el locker está en Renovación ──────────
+            string idLockerStr = selectedLockerId.Value.ToString();
+            string? matricula = Funciones.ObtenerMatriculaPorLocker(idLockerStr);
+
+            if (string.IsNullOrEmpty(matricula))
             {
-                var frmRev = new frmRenovacionFuncion();
-                frmRev.StartPosition = FormStartPosition.CenterParent;
-                frmRev.ShowDialog(this);
-                RefrescarMapa();
+                MessageBox.Show("El locker seleccionado no tiene un alumno asignado activo.",
+                    "Sin asignación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
-            catch (Exception ex)
+
+            // Obtener info del alumno para mostrar en el diálogo
+            var info = Funciones.ObtenerAlumnoAsignadoPorLocker(selectedLockerId.Value);
+            string nombreAlumno = info?.Nombre ?? matricula;
+
+            // ── Paso 3: preguntar si reasigna al mismo locker u otro ────────
+            var respuesta = MessageBox.Show(
+                $"El alumno  {nombreAlumno}  está asignado al locker {selectedLockerId.Value}.\n\n" +
+                "¿Desea reasignarlo al MISMO locker?\n\n" +
+                "  [Sí]  → Mismo locker\n" +
+                "  [No]  → Elegir un locker diferente en el mapa\n" +
+                "  [Cancelar] → Salir",
+                "Renovación de locker",
+                MessageBoxButtons.YesNoCancel,
+                MessageBoxIcon.Question);
+
+            if (respuesta == DialogResult.Cancel) return;
+
+            if (respuesta == DialogResult.Yes)
             {
-                MessageBox.Show($"No se pudo abrir el formulario de renovación: {ex.Message}",
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // ── Mismo locker ────────────────────────────────────────────
+                var confirm = MessageBox.Show(
+                    $"¿Confirma la renovación de {nombreAlumno} en el locker {selectedLockerId.Value}?",
+                    "Confirmar renovación", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                if (confirm != DialogResult.Yes) return;
+
+                if (Funciones.EjecutarRenovacion(matricula, idLockerStr, selectedLockerId.Value))
+                {
+                    MessageBox.Show("Renovación realizada correctamente.", "Éxito",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    RefrescarMapa();
+                    LimpiarLabels();
+                    LimpiarCamposAlumno();
+                    txtBusqueda.Clear();
+                }
             }
+            else
+            {
+                // ── Locker diferente: activar modo selección en el mapa ─────
+                _modoSeleccionRenovacion = true;
+                _matriculaEnRenovacion = matricula;
+                _lockerAnteriorRenovacion = idLockerStr;
+
+                // Indicar visualmente al usuario qué hacer
+                MessageBox.Show(
+                    $"Haga clic en el locker disponible (verde) al que desea reasignar a {nombreAlumno}.\n\n" +
+                    "Solo se permitirá seleccionar lockers disponibles.",
+                    "Seleccione el nuevo locker",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                // Cambiar el texto del botón para indicar el modo activo
+                btnRenovar.Text = "Cancelar selección";
+                btnRenovar.BackColor = Color.FromArgb(255, 180, 0);
+            }
+        }
+
+        /// <summary>
+        /// Cancela el modo de selección de locker para renovación.
+        /// </summary>
+        private void CancelarModoRenovacion()
+        {
+            _modoSeleccionRenovacion = false;
+            _matriculaEnRenovacion = null;
+            _lockerAnteriorRenovacion = null;
+            btnRenovar.Text = "Renovar";
+            btnRenovar.BackColor = SystemColors.Control;
         }
 
         // ─────────────────────────────────────────────
