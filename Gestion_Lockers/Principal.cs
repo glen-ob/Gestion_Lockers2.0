@@ -536,7 +536,7 @@ namespace Gestion_Lockers
                 return;
             }
 
-            // ── Paso 2: verificar que el locker está en Renovación ──────────
+            // ── Paso 2: obtener alumno asignado al locker ───────────────────
             string idLockerStr = selectedLockerId.Value.ToString();
             string? matricula = Funciones.ObtenerMatriculaPorLocker(idLockerStr);
 
@@ -547,32 +547,28 @@ namespace Gestion_Lockers
                 return;
             }
 
-            // Obtener info del alumno para mostrar en el diálogo
             var info = Funciones.ObtenerAlumnoAsignadoPorLocker(selectedLockerId.Value);
             string nombreAlumno = info?.Nombre ?? matricula;
 
-            // ── Paso 3: preguntar si reasigna al mismo locker u otro ────────
-            var respuesta = MessageBox.Show(
-                $"El alumno  {nombreAlumno}  está asignado al locker {selectedLockerId.Value}.\n\n" +
-                "¿Desea reasignarlo al MISMO locker?\n\n" +
-                "  [Sí]  → Mismo locker\n" +
-                "  [No]  → Elegir un locker diferente en el mapa\n" +
-                "  [Cancelar] → Salir",
-                "Renovación de locker",
-                MessageBoxButtons.YesNoCancel,
-                MessageBoxIcon.Question);
+            // ── Paso 3: mostrar diálogo de edición de datos ─────────────────
+            using var dlg = new frmDatosRenovacion(
+                matricula,
+                info?.Nombre ?? string.Empty,
+                info?.Telefono ?? string.Empty,
+                selectedLockerId.Value);
 
-            if (respuesta == DialogResult.Cancel) return;
+            if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
-            if (respuesta == DialogResult.Yes)
+            // Guardar datos actualizados si cambiaron
+            Funciones.ActualizarDatosAlumno(
+                matricula,
+                dlg.NombreActualizado,
+                dlg.TelefonoActualizado,
+                dlg.IdCarreraSeleccionada);
+
+            // ── Paso 4: mismo locker o diferente ───────────────────────────
+            if (dlg.MismoLocker)
             {
-                // ── Mismo locker ────────────────────────────────────────────
-                var confirm = MessageBox.Show(
-                    $"¿Confirma la renovación de {nombreAlumno} en el locker {selectedLockerId.Value}?",
-                    "Confirmar renovación", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-                if (confirm != DialogResult.Yes) return;
-
                 if (Funciones.EjecutarRenovacion(matricula, idLockerStr, selectedLockerId.Value))
                 {
                     MessageBox.Show("Renovación realizada correctamente.", "Éxito",
@@ -585,20 +581,18 @@ namespace Gestion_Lockers
             }
             else
             {
-                // ── Locker diferente: activar modo selección en el mapa ─────
+                // Activar modo selección de locker en el mapa
                 _modoSeleccionRenovacion = true;
                 _matriculaEnRenovacion = matricula;
                 _lockerAnteriorRenovacion = idLockerStr;
 
-                // Indicar visualmente al usuario qué hacer
                 MessageBox.Show(
-                    $"Haga clic en el locker disponible (verde) al que desea reasignar a {nombreAlumno}.\n\n" +
+                    $"Haga clic en el locker disponible (verde) al que desea reasignar a {dlg.NombreActualizado}.\n\n" +
                     "Solo se permitirá seleccionar lockers disponibles.",
                     "Seleccione el nuevo locker",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
 
-                // Cambiar el texto del botón para indicar el modo activo
                 btnRenovar.Text = "Cancelar selección";
                 btnRenovar.BackColor = Color.FromArgb(255, 180, 0);
             }

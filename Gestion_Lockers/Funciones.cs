@@ -452,9 +452,10 @@ namespace Gestion_Lockers
             {
                 using var conn = DBConnection.GetConnection();
 
-                // Buscar periodo vencido (si existe en BD es que aún no fue cerrado)
+                // Buscar periodo vencido usando rowid como clave interna
+                // (id_renovacion puede ser NULL si no tiene AUTOINCREMENT configurado)
                 const string sqlCheck = @"
-                    SELECT id_renovacion, fecha_fin
+                    SELECT rowid, fecha_fin
                     FROM   Renovacion
                     WHERE  fecha_fin IS NOT NULL
                       AND  date(fecha_fin) < date('now')
@@ -469,8 +470,12 @@ namespace Gestion_Lockers
                 {
                     if (r.Read())
                     {
-                        idRenovacion = Convert.ToInt64(r["id_renovacion"]);
-                        fechaFinStr = r["fecha_fin"]?.ToString();
+                        var rawId = r["rowid"];
+                        if (rawId != DBNull.Value && rawId != null)
+                            idRenovacion = Convert.ToInt64(rawId);
+                        var rawFin = r["fecha_fin"];
+                        if (rawFin != DBNull.Value && rawFin != null)
+                            fechaFinStr = rawFin.ToString();
                     }
                 }
 
@@ -494,23 +499,27 @@ namespace Gestion_Lockers
 
                 using var tran = conn.BeginTransaction();
 
-                // Desactivar asignaciones de lockers que siguen en Renovación
+                // PASO 1: Desactivar asignaciones de lockers en Renovacion
                 using (var cmd = new SQLiteCommand(@"
-                    UPDATE asignaciones SET activa = 0
+                    UPDATE asignaciones
+                    SET    activa = 0, fecha_fin = date('now')
                     WHERE  activa = 1
-                      AND  id_locker IN (SELECT id_locker FROM lockers WHERE estado = '2');",
-                    conn, tran))
+                      AND  id_locker IN (
+                               SELECT id_locker FROM lockers
+                               WHERE  estado = 'Renovacion' OR estado = '2'
+                           );", conn, tran))
                     cmd.ExecuteNonQuery();
 
-                // Locker en Renovación → Disponible
-                using (var cmd = new SQLiteCommand(
-                    "UPDATE lockers SET estado = '0' WHERE estado = '2';", conn, tran))
+                // PASO 2: Lockers en Renovacion → Disponible
+                using (var cmd = new SQLiteCommand(@"
+                    UPDATE lockers
+                    SET    estado = 'Disponible'
+                    WHERE  estado = 'Renovacion' OR estado = '2';", conn, tran))
                     cmd.ExecuteNonQuery();
 
-                // Eliminar el registro — así el label de la pantalla principal
-                // no encuentra nada y queda vacío automáticamente.
+                // PASO 3: Eliminar registro de Renovacion
                 using (var cmd = new SQLiteCommand(
-                    "DELETE FROM Renovacion WHERE id_renovacion = @id;", conn, tran))
+                    "DELETE FROM Renovacion WHERE rowid = @id;", conn, tran))
                 {
                     cmd.Parameters.AddWithValue("@id", idRenovacion.Value);
                     cmd.ExecuteNonQuery();
@@ -903,6 +912,31 @@ namespace Gestion_Lockers
             }
 
             return sb.ToString();
+        }
+
+
+        // ─────────────────────────────────────────────
+        // Actualizar datos del alumno
+        // ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Actualiza nombre, teléfono y carrera del alumno.
+        /// Se usa durante el flujo de renovación para permitir correcciones.
+        /// </summary>
+        public static void ActualizarDatosAlumno(string matricula, string nombre, string telefono, int? idCarrera)
+        {
+            using var conn = DBConnection.GetConnection();
+            using var cmd = new SQLiteCommand(@"
+                UPDATE alumnos
+                SET nombre    = @nombre,
+                    telefono  = @telefono,
+                    id_carrera = @carrera
+                WHERE matricula = @mat;", conn);
+            cmd.Parameters.AddWithValue("@nombre", nombre);
+            cmd.Parameters.AddWithValue("@telefono", telefono);
+            cmd.Parameters.AddWithValue("@carrera", idCarrera.HasValue ? (object)idCarrera.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@mat", matricula);
+            cmd.ExecuteNonQuery();
         }
 
         private static string EscapeCsv(string? value)

@@ -1,20 +1,37 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
+using System.IO;
 using System.Data.SQLite;
 
-public class DBConnection
+namespace Gestion_Lockers
 {
-    private static string ruta = "Data Source=D:\\LockersDB\\LockersV1.0.db;Version=3;";
-
-    public static SQLiteConnection GetConnection()
+    public class DBConnection
     {
-        SQLiteConnection conn = new SQLiteConnection(ruta);
-        conn.Open();
-        return conn;
+        private static readonly string _rutaDB = ObtenerRuta();
+
+        private static string ObtenerRuta()
+        {
+            // Busca la BD en la carpeta Data/ relativa al ejecutable.
+            // Funciona tanto en desarrollo (bin/Debug) como en producción (publish/).
+            string carpetaEjecutable = AppDomain.CurrentDomain.BaseDirectory;
+            string rutaDB = Path.Combine(carpetaEjecutable, "Data", "LockersV1.0.db");
+
+            if (!File.Exists(rutaDB))
+            {
+                throw new FileNotFoundException(
+                    $"No se encontró la base de datos en:\n{rutaDB}\n\n" +
+                    "Verifica que el archivo LockersV1.0.db esté en la carpeta Data/ " +
+                    "junto al ejecutable.",
+                    rutaDB);
+            }
+
+            return $"Data Source={rutaDB};Version=3;";
+        }
+
+        public static SQLiteConnection GetConnection()
+        {
+            var conn = new SQLiteConnection(_rutaDB);
+            conn.Open();
+            return conn;
+        }
     }
 }
-
