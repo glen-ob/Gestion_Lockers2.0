@@ -37,7 +37,7 @@
             // btnBuscar
             // 
             btnBuscar.Font = new Font("Century Gothic", 18F);
-            btnBuscar.Location = new Point(139, 114);
+            btnBuscar.Location = new Point(111, 140);
             btnBuscar.Name = "btnBuscar";
             btnBuscar.Size = new Size(180, 58);
             btnBuscar.TabIndex = 2;
@@ -49,7 +49,7 @@
             // 
             label1.AutoSize = true;
             label1.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label1.Location = new Point(194, 9);
+            label1.Location = new Point(166, 35);
             label1.Name = "label1";
             label1.Size = new Size(256, 30);
             label1.TabIndex = 3;
@@ -58,7 +58,7 @@
             // txtRenovacion
             // 
             txtRenovacion.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            txtRenovacion.Location = new Point(139, 71);
+            txtRenovacion.Location = new Point(111, 97);
             txtRenovacion.Name = "txtRenovacion";
             txtRenovacion.Size = new Size(366, 37);
             txtRenovacion.TabIndex = 4;
@@ -66,7 +66,7 @@
             // btnCancelar
             // 
             btnCancelar.Font = new Font("Century Gothic", 18F);
-            btnCancelar.Location = new Point(325, 114);
+            btnCancelar.Location = new Point(297, 140);
             btnCancelar.Name = "btnCancelar";
             btnCancelar.Size = new Size(180, 58);
             btnCancelar.TabIndex = 5;

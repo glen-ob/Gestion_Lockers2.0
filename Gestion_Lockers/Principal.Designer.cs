@@ -66,13 +66,19 @@
             lblCasillero = new Label();
             lblMatricula = new Label();
             btnRenovar = new Button();
-            txtBusqueda = new TextBox();
+            txtBusquedaNombre = new TextBox();
             btnBuscar = new Button();
             btnLimpiarBusqueda = new Button();
             lblCarrera = new Label();
             cbCarrera = new ComboBox();
             cbPrecio = new ComboBox();
             label10 = new Label();
+            label11 = new Label();
+            label12 = new Label();
+            btnVaciarLocker = new Button();
+            txtLockerEnMapa = new TextBox();
+            button1 = new Button();
+            button2 = new Button();
             menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
             SuspendLayout();
@@ -310,7 +316,7 @@
             txtMatricula.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
             txtMatricula.Location = new Point(169, 495);
             txtMatricula.Name = "txtMatricula";
-            txtMatricula.Size = new Size(283, 37);
+            txtMatricula.Size = new Size(374, 37);
             txtMatricula.TabIndex = 13;
             // 
             // txtTelefono
@@ -318,7 +324,7 @@
             txtTelefono.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
             txtTelefono.Location = new Point(169, 538);
             txtTelefono.Name = "txtTelefono";
-            txtTelefono.Size = new Size(283, 37);
+            txtTelefono.Size = new Size(374, 37);
             txtTelefono.TabIndex = 12;
             // 
             // TXTNombre
@@ -326,15 +332,15 @@
             TXTNombre.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
             TXTNombre.Location = new Point(169, 452);
             TXTNombre.Name = "TXTNombre";
-            TXTNombre.Size = new Size(283, 37);
+            TXTNombre.Size = new Size(374, 37);
             TXTNombre.TabIndex = 11;
             // 
             // btnAsignar
             // 
             btnAsignar.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            btnAsignar.Location = new Point(312, 637);
+            btnAsignar.Location = new Point(363, 637);
             btnAsignar.Name = "btnAsignar";
-            btnAsignar.Size = new Size(137, 58);
+            btnAsignar.Size = new Size(180, 58);
             btnAsignar.TabIndex = 19;
             btnAsignar.Text = "Asignar";
             btnAsignar.UseVisualStyleBackColor = true;
@@ -343,7 +349,7 @@
             // 
             label7.AutoSize = true;
             label7.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label7.Location = new Point(635, 463);
+            label7.Location = new Point(605, 502);
             label7.Name = "label7";
             label7.Size = new Size(133, 30);
             label7.TabIndex = 25;
@@ -353,17 +359,18 @@
             // 
             label8.AutoSize = true;
             label8.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label8.Location = new Point(551, 417);
+            label8.Location = new Point(625, 459);
             label8.Name = "label8";
-            label8.Size = new Size(217, 30);
+            label8.Size = new Size(113, 30);
             label8.TabIndex = 24;
-            label8.Text = "Nombre Alumno:";
+            label8.Text = "Alumno:";
+            label8.Click += label8_Click;
             // 
             // label9
             // 
             label9.AutoSize = true;
             label9.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label9.Location = new Point(645, 370);
+            label9.Location = new Point(615, 545);
             label9.Name = "label9";
             label9.Size = new Size(123, 30);
             label9.TabIndex = 23;
@@ -373,7 +380,7 @@
             // 
             lblNombre.AutoSize = true;
             lblNombre.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            lblNombre.Location = new Point(780, 417);
+            lblNombre.Location = new Point(750, 459);
             lblNombre.Name = "lblNombre";
             lblNombre.Size = new Size(133, 30);
             lblNombre.TabIndex = 22;
@@ -383,7 +390,7 @@
             // 
             lblCasillero.AutoSize = true;
             lblCasillero.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            lblCasillero.Location = new Point(780, 370);
+            lblCasillero.Location = new Point(750, 545);
             lblCasillero.Name = "lblCasillero";
             lblCasillero.Size = new Size(104, 30);
             lblCasillero.TabIndex = 21;
@@ -393,7 +400,7 @@
             // 
             lblMatricula.AutoSize = true;
             lblMatricula.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            lblMatricula.Location = new Point(780, 463);
+            lblMatricula.Location = new Point(750, 502);
             lblMatricula.Name = "lblMatricula";
             lblMatricula.Size = new Size(104, 30);
             lblMatricula.TabIndex = 20;
@@ -404,19 +411,20 @@
             btnRenovar.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
             btnRenovar.Location = new Point(169, 637);
             btnRenovar.Name = "btnRenovar";
-            btnRenovar.Size = new Size(137, 58);
+            btnRenovar.Size = new Size(188, 58);
             btnRenovar.TabIndex = 26;
             btnRenovar.Text = "Renovar";
             btnRenovar.UseVisualStyleBackColor = true;
+            btnRenovar.Click += btnRenovar_Click_1;
             // 
-            // txtBusqueda
+            // txtBusquedaNombre
             // 
-            txtBusqueda.Font = new Font("Century Gothic", 13F);
-            txtBusqueda.Location = new Point(22, 372);
-            txtBusqueda.Name = "txtBusqueda";
-            txtBusqueda.PlaceholderText = "Buscar por #locker, nombre o matrícula";
-            txtBusqueda.Size = new Size(380, 29);
-            txtBusqueda.TabIndex = 30;
+            txtBusquedaNombre.Font = new Font("Century Gothic", 13F);
+            txtBusquedaNombre.Location = new Point(22, 372);
+            txtBusquedaNombre.Name = "txtBusquedaNombre";
+            txtBusquedaNombre.PlaceholderText = "Buscar por nombre de estudiante";
+            txtBusquedaNombre.Size = new Size(380, 29);
+            txtBusquedaNombre.TabIndex = 30;
             // 
             // btnBuscar
             // 
@@ -454,7 +462,7 @@
             cbCarrera.FormattingEnabled = true;
             cbCarrera.Location = new Point(169, 586);
             cbCarrera.Name = "cbCarrera";
-            cbCarrera.Size = new Size(283, 38);
+            cbCarrera.Size = new Size(374, 38);
             cbCarrera.TabIndex = 34;
             // 
             // cbPrecio
@@ -476,11 +484,77 @@
             label10.TabIndex = 36;
             label10.Text = "Precio:";
             // 
+            // label11
+            // 
+            label11.AutoSize = true;
+            label11.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            label11.Location = new Point(503, 50);
+            label11.Name = "label11";
+            label11.Size = new Size(99, 30);
+            label11.TabIndex = 38;
+            label11.Text = "Usuario";
+            // 
+            // label12
+            // 
+            label12.AutoSize = true;
+            label12.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            label12.Location = new Point(402, 50);
+            label12.Name = "label12";
+            label12.Size = new Size(106, 30);
+            label12.TabIndex = 37;
+            label12.Text = "Usuario:";
+            // 
+            // btnVaciarLocker
+            // 
+            btnVaciarLocker.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            btnVaciarLocker.Location = new Point(274, 701);
+            btnVaciarLocker.Name = "btnVaciarLocker";
+            btnVaciarLocker.Size = new Size(180, 58);
+            btnVaciarLocker.TabIndex = 39;
+            btnVaciarLocker.Text = "Vaciar";
+            btnVaciarLocker.UseVisualStyleBackColor = true;
+            btnVaciarLocker.Click += btnVaciarLocker_Click;
+            // 
+            // txtLockerEnMapa
+            // 
+            txtLockerEnMapa.Font = new Font("Century Gothic", 13F);
+            txtLockerEnMapa.Location = new Point(745, 372);
+            txtLockerEnMapa.Name = "txtLockerEnMapa";
+            txtLockerEnMapa.PlaceholderText = "Buscar locker en mapa";
+            txtLockerEnMapa.Size = new Size(380, 29);
+            txtLockerEnMapa.TabIndex = 40;
+            // 
+            // button1
+            // 
+            button1.Font = new Font("Century Gothic", 12F);
+            button1.Location = new Point(745, 410);
+            button1.Name = "button1";
+            button1.Size = new Size(183, 36);
+            button1.TabIndex = 41;
+            button1.Text = "Buscar";
+            button1.UseVisualStyleBackColor = true;
+            // 
+            // button2
+            // 
+            button2.Font = new Font("Century Gothic", 12F);
+            button2.Location = new Point(943, 410);
+            button2.Name = "button2";
+            button2.Size = new Size(183, 36);
+            button2.TabIndex = 42;
+            button2.Text = "Limpiar";
+            button2.UseVisualStyleBackColor = true;
+            // 
             // Principal
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1137, 791);
+            Controls.Add(txtLockerEnMapa);
+            Controls.Add(button1);
+            Controls.Add(button2);
+            Controls.Add(btnVaciarLocker);
+            Controls.Add(label11);
+            Controls.Add(label12);
             Controls.Add(label10);
             Controls.Add(cbPrecio);
             Controls.Add(cbCarrera);
@@ -509,7 +583,7 @@
             Controls.Add(lblFechaRenovacion);
             Controls.Add(label1);
             Controls.Add(menuStrip1);
-            Controls.Add(txtBusqueda);
+            Controls.Add(txtBusquedaNombre);
             Controls.Add(btnBuscar);
             Controls.Add(btnLimpiarBusqueda);
             MainMenuStrip = menuStrip1;
@@ -543,6 +617,7 @@
         private Label lblFechaRenovacion;
         private Label label3;
         private Label lblFecha;
+        private Label lblUsuario;
         private ToolStripMenuItem cancelarRenovacionToolStripMenuItem;
         private ComboBox cbUbicacion;
         private DataGridView dataGridView1;
@@ -563,12 +638,18 @@
         private Label lblCasillero;
         private Label lblMatricula;
         private Button btnRenovar;
-        private TextBox txtBusqueda;
+        private TextBox txtBusquedaNombre;
         private Button btnBuscar;
         private Button btnLimpiarBusqueda;
         private Label lblCarrera;
         private ComboBox cbCarrera;
         private ComboBox cbPrecio;
         private Label label10;
+        private Label label11;
+        private Label label12;
+        private Button btnVaciarLocker;
+        private TextBox txtLockerEnMapa;
+        private Button button1;
+        private Button button2;
     }
 }

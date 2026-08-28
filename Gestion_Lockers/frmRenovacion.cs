@@ -138,8 +138,13 @@ namespace Gestion_Lockers
             Controls.Add(btnActu);
             Controls.Add(textBox1);
             Name = "frmRenovacion";
+            Load += frmRenovacion_Load;
             ResumeLayout(false);
             PerformLayout();
+        }
+
+        private void frmRenovacion_Load(object sender, EventArgs e)
+        {
 
         }
     }

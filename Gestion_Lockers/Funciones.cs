@@ -9,27 +9,27 @@ using System.Windows.Forms;
 
 namespace Gestion_Lockers
 {
-    internal static class Funciones
+    public static class Funciones
     {
         // ─────────────────────────────────────────────
         // Tipos de datos
         // ─────────────────────────────────────────────
 
-        internal record AsignacionInfo(string Nombre, string Matricula, string Telefono);
+        public record AsignacionInfo(string Nombre, string Matricula, string Telefono);
 
-        internal record BusquedaLockerInfo(
+        public record BusquedaLockerInfo(
             int IdLocker,
             string Estado,
             string Nombre,
             string Matricula,
             string Telefono);
 
-        internal record PrecioItem(int IdPrecio, string Nombre, decimal Monto)
+        public record PrecioItem(int IdPrecio, string Nombre, decimal Monto)
         {
             public override string ToString() => $"{Nombre}  (${Monto:0.00})";
         }
 
-        internal record CarreraItem(int IdCarrera, string Nombre)
+        public record CarreraItem(int IdCarrera, string Nombre)
         {
             public override string ToString() => Nombre;
         }
@@ -78,6 +78,7 @@ namespace Gestion_Lockers
 
             public override string ToString() => Texto;
         }
+
 
         /// <summary>
         /// Rellena el ComboBox con entradas jerárquicas Piso → Zona.
@@ -362,16 +363,16 @@ namespace Gestion_Lockers
         /// Busca un locker por id numérico, nombre o matrícula del alumno asignado.
         /// Devuelve null si no encuentra resultado.
         /// </summary>
-        public static BusquedaLockerInfo? BuscarLocker(string termino)
+        public static List<BusquedaLockerInfo> BuscarLockers(string termino)
         {
-            if (string.IsNullOrWhiteSpace(termino)) return null;
+            if (string.IsNullOrWhiteSpace(termino)) return new List<BusquedaLockerInfo>();
             string t = termino.Trim();
 
             try
             {
                 using var conn = DBConnection.GetConnection();
 
-                // Búsqueda por id numérico exacto
+                // busca por id 
                 if (int.TryParse(t, out int idNum))
                 {
                     const string sqlId = @"
@@ -382,25 +383,36 @@ namespace Gestion_Lockers
                         FROM   lockers l
                         LEFT JOIN asignaciones a  ON l.id_locker = a.id_locker AND a.activa = 1
                         LEFT JOIN alumnos      al ON a.matricula  = al.matricula
-                        WHERE  l.id_locker = @id
-                        LIMIT  1;";
+                        WHERE  l.id_locker = @id;";
                     using var cmd = new SQLiteCommand(sqlId, conn);
                     cmd.Parameters.AddWithValue("@id", idNum);
                     using var r = cmd.ExecuteReader();
-                    if (r.Read())
-                        return new BusquedaLockerInfo(
+                    var resultados = new List<BusquedaLockerInfo>();
+                    while (r.Read())
+                    {
+                        resultados.Add(new BusquedaLockerInfo(
                             Convert.ToInt32(r["id_locker"]),
                             r["estado"]?.ToString() ?? string.Empty,
                             r["nombre"]?.ToString() ?? string.Empty,
                             r["matricula"]?.ToString() ?? string.Empty,
-                            r["telefono"]?.ToString() ?? string.Empty);
+                            r["telefono"]?.ToString() ?? string.Empty));
+                    }
 
-                    MessageBox.Show($"No se encontró el locker {idNum}.",
-                        "Sin resultados", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return null;
+                    if (resultados.Count == 0)
+                    {
+                        MessageBox.Show($"No se encontró el locker {idNum}.",
+                            "Sin resultados", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else if (resultados.Count > 1)
+                    {
+                        MessageBox.Show($"Se encontraron {resultados.Count} lockers con el ID {idNum}. Se mostrará el primero.",
+                            "Múltiples resultados", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+
+                    return resultados;
                 }
 
-                // Búsqueda por nombre o matrícula
+                // busca por nombre o matrícula (devuelve todos los resultados)
                 const string sqlNombre = @"
                     SELECT l.id_locker, l.estado,
                            al.nombre, al.matricula, al.telefono
@@ -410,29 +422,40 @@ namespace Gestion_Lockers
                     WHERE  a.activa = 1
                       AND  (al.nombre    LIKE @term COLLATE NOCASE
                          OR al.matricula LIKE @term COLLATE NOCASE)
-                    ORDER  BY al.nombre ASC
-                    LIMIT  1;";
+                    ORDER  BY al.nombre ASC;";
                 using var cmd2 = new SQLiteCommand(sqlNombre, conn);
                 cmd2.Parameters.AddWithValue("@term", "%" + t + "%");
                 using var r2 = cmd2.ExecuteReader();
-                if (r2.Read())
-                    return new BusquedaLockerInfo(
+                var resultadosNombre = new List<BusquedaLockerInfo>();
+                while (r2.Read())
+                {
+                    resultadosNombre.Add(new BusquedaLockerInfo(
                         Convert.ToInt32(r2["id_locker"]),
                         r2["estado"]?.ToString() ?? string.Empty,
                         r2["nombre"]?.ToString() ?? string.Empty,
                         r2["matricula"]?.ToString() ?? string.Empty,
-                        r2["telefono"]?.ToString() ?? string.Empty);
+                        r2["telefono"]?.ToString() ?? string.Empty));
+                }
 
-                MessageBox.Show($"No se encontró ningún alumno con '{t}'.",
-                    "Sin resultados", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (resultadosNombre.Count == 0)
+                {
+                    MessageBox.Show($"No se encontró ningún alumno con '{t}'.",
+                        "Sin resultados", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else if (resultadosNombre.Count > 1)
+                {
+                    MessageBox.Show($"Se encontraron {resultadosNombre.Count} lockers para '{t}'. Seleccione uno en la lista.",
+                        "Múltiples resultados", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+
+                return resultadosNombre;
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error en búsqueda: " + ex.Message,
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return new List<BusquedaLockerInfo>(); // Devuelve una lista vacía en caso de error
             }
-
-            return null;
         }
 
         // ─────────────────────────────────────────────

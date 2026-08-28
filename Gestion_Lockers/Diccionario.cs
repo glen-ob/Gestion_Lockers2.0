@@ -10,7 +10,7 @@ namespace Gestion_Lockers
 {
     public class Diccionario
     {
-        private readonly Dictionary<string, string> estadosLockers = new Dictionary<string, string>();
+        public readonly Dictionary<string, string> estadosLockers = new Dictionary<string, string>();
 
         // Exponer lectura si lo necesitas desde fuera
         public IReadOnlyDictionary<string, string> EstadosLockers => estadosLockers;

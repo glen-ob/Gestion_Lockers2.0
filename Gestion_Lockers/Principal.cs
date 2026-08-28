@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using Microsoft.VisualBasic.Logging;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Gestion_Lockers
 {
@@ -11,6 +13,7 @@ namespace Gestion_Lockers
     {
         private int? selectedLockerId = null;
         private int currentUserId;
+        private string currentUser = string.Empty;
         private string currentUserRole = string.Empty;
 
         private readonly Diccionario diccionario = new Diccionario();
@@ -26,9 +29,10 @@ namespace Gestion_Lockers
             LimpiarLabels();
         }
 
-        public Principal(int userId, string role) : this()
+        public Principal(int userId, string nombre, string role) : this()
         {
             currentUserId = userId;
+            currentUser = nombre;
             currentUserRole = role;
         }
 
@@ -46,7 +50,7 @@ namespace Gestion_Lockers
             btnRenovar.Click += BtnRenovar_Click;
 
             // Búsqueda: Enter en el TextBox o clic en el botón
-            txtBusqueda.KeyDown += TxtBusqueda_KeyDown;
+            txtBusquedaNombre.KeyDown += TxtBusqueda_KeyDown;
             btnBuscar.Click += BtnBuscar_Click;
             btnLimpiarBusqueda.Click += BtnLimpiarBusqueda_Click;
         }
@@ -58,6 +62,8 @@ namespace Gestion_Lockers
         private void Principal_Load(object? sender, EventArgs e)
         {
             lblFecha.Text = DateTime.Now.ToString("dd/MM/yyyy");
+            label11.Text = currentUser;
+
 
             // Label de renovación: visible solo si hay un periodo activo vigente
             try
@@ -230,7 +236,7 @@ namespace Gestion_Lockers
                         RefrescarMapa();
                         LimpiarLabels();
                         LimpiarCamposAlumno();
-                        txtBusqueda.Clear();
+                        txtBusquedaNombre.Clear();
                     }
                 }
                 // Si cancela la confirmación se mantiene el modo activo para elegir otro
@@ -282,7 +288,7 @@ namespace Gestion_Lockers
 
         private void BtnLimpiarBusqueda_Click(object? sender, EventArgs e)
         {
-            txtBusqueda.Clear();
+            txtBusquedaNombre.Clear();
             selectedLockerId = null;
             LimpiarLabels();
             LimpiarCamposAlumno();
@@ -291,17 +297,18 @@ namespace Gestion_Lockers
 
         private void EjecutarBusqueda()
         {
-            string termino = txtBusqueda.Text.Trim();
+            string termino = txtBusquedaNombre.Text.Trim();
             if (string.IsNullOrEmpty(termino)) return;
+            var resultados = Funciones.BuscarLockers(termino);
+            if (resultados.Count == 0) return;
 
-            var resultado = Funciones.BuscarLocker(termino);
-            if (resultado == null) return;
-
-            // Mostrar datos en panel lateral
-            MostrarInfoLocker(resultado.IdLocker);
-
-            // Resaltar la celda en el grid si es visible en el piso actual
-            ResaltarLockerEnGrid(resultado.IdLocker);
+            using var formSeleccion = new frmSeleccionLocker(resultados);
+            if (formSeleccion.ShowDialog() == DialogResult.OK)
+            {
+                var lockerSeleccionado = formSeleccion.LockerSeleccionado;
+                MostrarInfoLocker(lockerSeleccionado.IdLocker); 
+                ResaltarLockerEnGrid(lockerSeleccionado.IdLocker); 
+            }
         }
 
         /// <summary>
@@ -360,14 +367,15 @@ namespace Gestion_Lockers
         // ─────────────────────────────────────────────
 
         private void BtnAsignar_Click(object? sender, EventArgs e)
-        {
+        { 
             string nombre = TXTNombre.Text.Trim();
             string telefono = txtTelefono.Text.Trim();
             string matricula = txtMatricula.Text.Trim();
+            string carrera = cbCarrera.Text.Trim();
 
-            if (string.IsNullOrEmpty(nombre) || string.IsNullOrEmpty(matricula) || string.IsNullOrEmpty(telefono))
+            if (string.IsNullOrEmpty(nombre) || string.IsNullOrEmpty(matricula) || string.IsNullOrEmpty(telefono) || string.IsNullOrEmpty(carrera))
             {
-                MessageBox.Show("Todos los campos (Nombre, Matrícula, Teléfono) son obligatorios.",
+                MessageBox.Show("Todos los campos (Nombre, Matrícula, Teléfono y Carrera) son obligatorios.",
                     "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -393,12 +401,12 @@ namespace Gestion_Lockers
                 return;
             }
 
-            if (Funciones.AlumnoTieneAsignacionActiva(matricula))
-            {
-                MessageBox.Show("El alumno ya tiene un locker asignado activo.",
-                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+            //if (Funciones.AlumnoTieneAsignacionActiva(matricula))
+            //{
+            //    MessageBox.Show("El alumno ya tiene un locker asignado activo.",
+            //        "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            //    return;
+            //}
 
             // Precio seleccionado
             var precioSel = cbPrecio.SelectedItem as Funciones.PrecioItem;
@@ -431,6 +439,7 @@ namespace Gestion_Lockers
                     return;
                 }
                 currentUserId = login.UserId;
+                currentUser = login.UserName;
                 currentUserRole = login.UserRole;
             }
 
@@ -507,7 +516,7 @@ namespace Gestion_Lockers
             RefrescarMapa();
             LimpiarCamposAlumno();
             LimpiarLabels();
-            txtBusqueda.Clear();
+            txtBusquedaNombre.Clear();
         }
 
         // ─────────────────────────────────────────────
@@ -576,7 +585,7 @@ namespace Gestion_Lockers
                     RefrescarMapa();
                     LimpiarLabels();
                     LimpiarCamposAlumno();
-                    txtBusqueda.Clear();
+                    txtBusquedaNombre.Clear();
                 }
             }
             else
@@ -824,6 +833,99 @@ namespace Gestion_Lockers
         private void Principal_Load_1(object sender, EventArgs e)
         {
 
+        }
+
+        private void label8_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void btnRenovar_Click_1(object sender, EventArgs e)
+        {
+
+        }
+
+        private void btnVaciarLocker_Click(object sender, EventArgs e)
+        {
+            string nombre = TXTNombre.Text.Trim();
+            string telefono = txtTelefono.Text.Trim();
+            string matricula = txtMatricula.Text.Trim();
+
+            if (!selectedLockerId.HasValue)
+            {
+                MessageBox.Show("Busque o seleccione el locker del alumno que desea eliminar.",
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(nombre) || string.IsNullOrEmpty(matricula) || string.IsNullOrEmpty(telefono))
+            {
+                MessageBox.Show("El locker ya esta disponible.",
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var dr = MessageBox.Show(
+                "¿Desea quitar al dueño actual de este locker? No se puede revertir este cambio.",
+                "Confirmar", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (dr != DialogResult.Yes) return;
+
+            try
+            {
+                using var conn = DBConnection.GetConnection();
+                using var tran = conn.BeginTransaction();
+
+                using (var cmdDelete = new SQLiteCommand(
+                     "DELETE FROM asignaciones WHERE id_locker = @idLocker;", conn, tran))
+
+                {
+                    cmdDelete.Parameters.AddWithValue("@idLocker", selectedLockerId.Value);
+                    int rowsAffected = cmdDelete.ExecuteNonQuery();
+
+                using (var cmdUpdateEstado = new SQLiteCommand(
+                    "UPDATE lockers SET estado = 'Disponible' WHERE id_locker = @idLocker;", conn, tran))
+                {
+                    cmdUpdateEstado.Parameters.AddWithValue("@idLocker", selectedLockerId.Value);
+                    cmdUpdateEstado.ExecuteNonQuery();
+                }
+
+                    if (rowsAffected > 0)
+                    {
+                        tran.Commit();
+
+                        string lockerId = selectedLockerId.Value.ToString();
+                        if (diccionario.estadosLockers.ContainsKey(lockerId))
+                        {
+                            diccionario.estadosLockers[lockerId] = "Disponible";
+                        }
+                        else
+                        {
+                            diccionario.estadosLockers.Add(lockerId, "Disponible");
+                        }
+                        MessageBox.Show($"Estado del locker {lockerId}: {diccionario.estadosLockers[lockerId]}");
+              
+
+                        MessageBox.Show("El registro de asignación ha sido eliminado correctamente.",
+                            "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+          ApplyEstadosEnGrid(); 
+                        RefrescarMapa(); 
+                        LimpiarLabels();
+                        LimpiarCamposAlumno();
+                        txtBusquedaNombre.Clear();
+                    }
+                    else
+                    {
+                        tran.Rollback();
+                        MessageBox.Show("No se encontró un registro de renovación asociado a este locker.",
+                            "Información", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al cancelar la renovación: {ex.Message}",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }

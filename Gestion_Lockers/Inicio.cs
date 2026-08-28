@@ -7,6 +7,7 @@ namespace Gestion_Lockers
     public partial class frm_Inicio : Form
     {
         public int UserId { get; private set; }
+        public string UserName { get; private set; }
         public string UserRole { get; private set; } = string.Empty;
 
         public frm_Inicio()
@@ -43,7 +44,7 @@ namespace Gestion_Lockers
             {
                 using var conn = DBConnection.GetConnection();
                 using var cmd = new SQLiteCommand(
-                    "SELECT id_usuario, contrasena, tipo_usuario FROM usuarios_sistema WHERE nombre = @nombre LIMIT 1;",
+                    "SELECT id_usuario, nombre, contrasena, tipo_usuario FROM usuarios_sistema WHERE nombre = @nombre LIMIT 1;",
                     conn);
                 cmd.Parameters.AddWithValue("@nombre", usuario);
 
@@ -57,6 +58,7 @@ namespace Gestion_Lockers
 
                 int id = reader["id_usuario"] != DBNull.Value ? Convert.ToInt32(reader["id_usuario"]) : 0;
                 string contrasenaAlmacenada = reader["contrasena"]?.ToString() ?? string.Empty;
+                string nombreUsuario = reader["nombre"]?.ToString() ?? string.Empty;
                 string rol = reader["tipo_usuario"]?.ToString() ?? string.Empty;
 
                 if (!string.Equals(contrasenaAlmacenada, Funciones.HashPassword(contrasena),
@@ -68,6 +70,7 @@ namespace Gestion_Lockers
                 }
 
                 UserId = id;
+                UserName = nombreUsuario;
                 UserRole = rol;
                 DialogResult = DialogResult.OK;
                 Close();

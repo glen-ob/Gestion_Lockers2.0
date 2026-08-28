@@ -46,7 +46,7 @@
             textBox1.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
             textBox1.Location = new Point(168, 39);
             textBox1.Name = "textBox1";
-            textBox1.Size = new Size(283, 37);
+            textBox1.Size = new Size(434, 37);
             textBox1.TabIndex = 0;
             // 
             // textBox2
@@ -54,7 +54,7 @@
             textBox2.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
             textBox2.Location = new Point(168, 125);
             textBox2.Name = "textBox2";
-            textBox2.Size = new Size(283, 37);
+            textBox2.Size = new Size(434, 37);
             textBox2.TabIndex = 1;
             // 
             // textBox3
@@ -62,7 +62,7 @@
             textBox3.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
             textBox3.Location = new Point(168, 82);
             textBox3.Name = "textBox3";
-            textBox3.Size = new Size(283, 37);
+            textBox3.Size = new Size(434, 37);
             textBox3.TabIndex = 2;
             // 
             // label1
@@ -98,7 +98,7 @@
             // btnagregar
             // 
             btnagregar.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            btnagregar.Location = new Point(12, 383);
+            btnagregar.Location = new Point(661, 383);
             btnagregar.Name = "btnagregar";
             btnagregar.Size = new Size(127, 55);
             btnagregar.TabIndex = 6;
@@ -118,7 +118,7 @@
             // btnRegresar
             // 
             btnRegresar.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            btnRegresar.Location = new Point(278, 383);
+            btnRegresar.Location = new Point(12, 383);
             btnRegresar.Name = "btnRegresar";
             btnRegresar.Size = new Size(127, 55);
             btnRegresar.TabIndex = 8;

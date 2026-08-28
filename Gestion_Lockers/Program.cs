@@ -42,7 +42,7 @@ namespace Gestion_Lockers
                 }
 
                 // Abrir principal pasando usuario y rol
-                Application.Run(new Principal(login.UserId, login.UserRole));
+                Application.Run(new Principal(login.UserId, login.UserName, login.UserRole));
             }
         }
     }
