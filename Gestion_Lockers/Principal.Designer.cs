@@ -76,9 +76,6 @@
             label11 = new Label();
             label12 = new Label();
             btnVaciarLocker = new Button();
-            txtLockerEnMapa = new TextBox();
-            button1 = new Button();
-            button2 = new Button();
             menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
             SuspendLayout();
@@ -422,8 +419,8 @@
             txtBusquedaNombre.Font = new Font("Century Gothic", 13F);
             txtBusquedaNombre.Location = new Point(22, 372);
             txtBusquedaNombre.Name = "txtBusquedaNombre";
-            txtBusquedaNombre.PlaceholderText = "Buscar por nombre de estudiante";
-            txtBusquedaNombre.Size = new Size(380, 29);
+            txtBusquedaNombre.PlaceholderText = "Buscar por #locker o nombre de estudiante";
+            txtBusquedaNombre.Size = new Size(400, 29);
             txtBusquedaNombre.TabIndex = 30;
             // 
             // btnBuscar
@@ -439,7 +436,7 @@
             // btnLimpiarBusqueda
             // 
             btnLimpiarBusqueda.Font = new Font("Century Gothic", 12F);
-            btnLimpiarBusqueda.Location = new Point(220, 410);
+            btnLimpiarBusqueda.Location = new Point(239, 410);
             btnLimpiarBusqueda.Name = "btnLimpiarBusqueda";
             btnLimpiarBusqueda.Size = new Size(183, 36);
             btnLimpiarBusqueda.TabIndex = 32;
@@ -488,7 +485,7 @@
             // 
             label11.AutoSize = true;
             label11.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label11.Location = new Point(503, 50);
+            label11.Location = new Point(878, 50);
             label11.Name = "label11";
             label11.Size = new Size(99, 30);
             label11.TabIndex = 38;
@@ -498,7 +495,7 @@
             // 
             label12.AutoSize = true;
             label12.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label12.Location = new Point(402, 50);
+            label12.Location = new Point(777, 50);
             label12.Name = "label12";
             label12.Size = new Size(106, 30);
             label12.TabIndex = 37;
@@ -515,43 +512,11 @@
             btnVaciarLocker.UseVisualStyleBackColor = true;
             btnVaciarLocker.Click += btnVaciarLocker_Click;
             // 
-            // txtLockerEnMapa
-            // 
-            txtLockerEnMapa.Font = new Font("Century Gothic", 13F);
-            txtLockerEnMapa.Location = new Point(745, 372);
-            txtLockerEnMapa.Name = "txtLockerEnMapa";
-            txtLockerEnMapa.PlaceholderText = "Buscar locker en mapa";
-            txtLockerEnMapa.Size = new Size(380, 29);
-            txtLockerEnMapa.TabIndex = 40;
-            // 
-            // button1
-            // 
-            button1.Font = new Font("Century Gothic", 12F);
-            button1.Location = new Point(745, 410);
-            button1.Name = "button1";
-            button1.Size = new Size(183, 36);
-            button1.TabIndex = 41;
-            button1.Text = "Buscar";
-            button1.UseVisualStyleBackColor = true;
-            // 
-            // button2
-            // 
-            button2.Font = new Font("Century Gothic", 12F);
-            button2.Location = new Point(943, 410);
-            button2.Name = "button2";
-            button2.Size = new Size(183, 36);
-            button2.TabIndex = 42;
-            button2.Text = "Limpiar";
-            button2.UseVisualStyleBackColor = true;
-            // 
             // Principal
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1137, 791);
-            Controls.Add(txtLockerEnMapa);
-            Controls.Add(button1);
-            Controls.Add(button2);
             Controls.Add(btnVaciarLocker);
             Controls.Add(label11);
             Controls.Add(label12);
@@ -648,8 +613,5 @@
         private Label label11;
         private Label label12;
         private Button btnVaciarLocker;
-        private TextBox txtLockerEnMapa;
-        private Button button1;
-        private Button button2;
     }
 }
