@@ -50,8 +50,6 @@
             cbUbicacion = new ComboBox();
             dataGridView1 = new DataGridView();
             label2 = new Label();
-            rbGrupoCultural = new RadioButton();
-            rbGrupoAcademico = new RadioButton();
             label4 = new Label();
             label5 = new Label();
             label6 = new Label();
@@ -76,6 +74,11 @@
             label11 = new Label();
             label12 = new Label();
             btnVaciarLocker = new Button();
+            btnEditar = new Button();
+            rbGrupoAcademico = new RadioButton();
+            rbGrupoCultural = new RadioButton();
+            label13 = new Label();
+            txtAtendio = new TextBox();
             menuStrip1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
             SuspendLayout();
@@ -254,35 +257,11 @@
             label2.TabIndex = 9;
             label2.Text = "Area:";
             // 
-            // rbGrupoCultural
-            // 
-            rbGrupoCultural.AutoSize = true;
-            rbGrupoCultural.Font = new Font("Century Gothic", 18F);
-            rbGrupoCultural.Location = new Point(343, 802);
-            rbGrupoCultural.Name = "rbGrupoCultural";
-            rbGrupoCultural.Size = new Size(206, 34);
-            rbGrupoCultural.TabIndex = 18;
-            rbGrupoCultural.TabStop = true;
-            rbGrupoCultural.Text = "Grupo Cultural";
-            rbGrupoCultural.UseVisualStyleBackColor = true;
-            // 
-            // rbGrupoAcademico
-            // 
-            rbGrupoAcademico.AutoSize = true;
-            rbGrupoAcademico.Font = new Font("Century Gothic", 18F);
-            rbGrupoAcademico.Location = new Point(81, 802);
-            rbGrupoAcademico.Name = "rbGrupoAcademico";
-            rbGrupoAcademico.Size = new Size(256, 34);
-            rbGrupoAcademico.TabIndex = 17;
-            rbGrupoAcademico.TabStop = true;
-            rbGrupoAcademico.Text = "Grupo Academico";
-            rbGrupoAcademico.UseVisualStyleBackColor = true;
-            // 
             // label4
             // 
             label4.AutoSize = true;
             label4.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label4.Location = new Point(39, 545);
+            label4.Location = new Point(39, 514);
             label4.Name = "label4";
             label4.Size = new Size(124, 30);
             label4.TabIndex = 16;
@@ -292,7 +271,7 @@
             // 
             label5.AutoSize = true;
             label5.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label5.Location = new Point(30, 502);
+            label5.Location = new Point(574, 459);
             label5.Name = "label5";
             label5.Size = new Size(133, 30);
             label5.TabIndex = 15;
@@ -311,7 +290,7 @@
             // txtMatricula
             // 
             txtMatricula.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            txtMatricula.Location = new Point(169, 495);
+            txtMatricula.Location = new Point(713, 452);
             txtMatricula.Name = "txtMatricula";
             txtMatricula.Size = new Size(374, 37);
             txtMatricula.TabIndex = 13;
@@ -319,7 +298,7 @@
             // txtTelefono
             // 
             txtTelefono.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            txtTelefono.Location = new Point(169, 538);
+            txtTelefono.Location = new Point(169, 507);
             txtTelefono.Name = "txtTelefono";
             txtTelefono.Size = new Size(374, 37);
             txtTelefono.TabIndex = 12;
@@ -335,7 +314,7 @@
             // btnAsignar
             // 
             btnAsignar.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            btnAsignar.Location = new Point(363, 637);
+            btnAsignar.Location = new Point(688, 640);
             btnAsignar.Name = "btnAsignar";
             btnAsignar.Size = new Size(180, 58);
             btnAsignar.TabIndex = 19;
@@ -346,7 +325,7 @@
             // 
             label7.AutoSize = true;
             label7.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label7.Location = new Point(605, 502);
+            label7.Location = new Point(619, 818);
             label7.Name = "label7";
             label7.Size = new Size(133, 30);
             label7.TabIndex = 25;
@@ -356,7 +335,7 @@
             // 
             label8.AutoSize = true;
             label8.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label8.Location = new Point(625, 459);
+            label8.Location = new Point(639, 775);
             label8.Name = "label8";
             label8.Size = new Size(113, 30);
             label8.TabIndex = 24;
@@ -367,7 +346,7 @@
             // 
             label9.AutoSize = true;
             label9.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            label9.Location = new Point(615, 545);
+            label9.Location = new Point(629, 861);
             label9.Name = "label9";
             label9.Size = new Size(123, 30);
             label9.TabIndex = 23;
@@ -377,7 +356,7 @@
             // 
             lblNombre.AutoSize = true;
             lblNombre.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            lblNombre.Location = new Point(750, 459);
+            lblNombre.Location = new Point(764, 775);
             lblNombre.Name = "lblNombre";
             lblNombre.Size = new Size(133, 30);
             lblNombre.TabIndex = 22;
@@ -387,7 +366,7 @@
             // 
             lblCasillero.AutoSize = true;
             lblCasillero.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            lblCasillero.Location = new Point(750, 545);
+            lblCasillero.Location = new Point(764, 861);
             lblCasillero.Name = "lblCasillero";
             lblCasillero.Size = new Size(104, 30);
             lblCasillero.TabIndex = 21;
@@ -397,7 +376,7 @@
             // 
             lblMatricula.AutoSize = true;
             lblMatricula.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            lblMatricula.Location = new Point(750, 502);
+            lblMatricula.Location = new Point(764, 818);
             lblMatricula.Name = "lblMatricula";
             lblMatricula.Size = new Size(104, 30);
             lblMatricula.TabIndex = 20;
@@ -406,9 +385,9 @@
             // btnRenovar
             // 
             btnRenovar.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            btnRenovar.Location = new Point(169, 637);
+            btnRenovar.Location = new Point(907, 640);
             btnRenovar.Name = "btnRenovar";
-            btnRenovar.Size = new Size(188, 58);
+            btnRenovar.Size = new Size(180, 58);
             btnRenovar.TabIndex = 26;
             btnRenovar.Text = "Renovar";
             btnRenovar.UseVisualStyleBackColor = true;
@@ -447,7 +426,7 @@
             // 
             lblCarrera.AutoSize = true;
             lblCarrera.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            lblCarrera.Location = new Point(54, 594);
+            lblCarrera.Location = new Point(598, 509);
             lblCarrera.Name = "lblCarrera";
             lblCarrera.Size = new Size(109, 30);
             lblCarrera.TabIndex = 33;
@@ -457,7 +436,7 @@
             // 
             cbCarrera.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
             cbCarrera.FormattingEnabled = true;
-            cbCarrera.Location = new Point(169, 586);
+            cbCarrera.Location = new Point(713, 506);
             cbCarrera.Name = "cbCarrera";
             cbCarrera.Size = new Size(374, 38);
             cbCarrera.TabIndex = 34;
@@ -504,7 +483,7 @@
             // btnVaciarLocker
             // 
             btnVaciarLocker.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            btnVaciarLocker.Location = new Point(274, 701);
+            btnVaciarLocker.Location = new Point(39, 640);
             btnVaciarLocker.Name = "btnVaciarLocker";
             btnVaciarLocker.Size = new Size(180, 58);
             btnVaciarLocker.TabIndex = 39;
@@ -512,11 +491,67 @@
             btnVaciarLocker.UseVisualStyleBackColor = true;
             btnVaciarLocker.Click += btnVaciarLocker_Click;
             // 
+            // btnEditar
+            // 
+            btnEditar.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            btnEditar.Location = new Point(258, 640);
+            btnEditar.Name = "btnEditar";
+            btnEditar.Size = new Size(180, 58);
+            btnEditar.TabIndex = 40;
+            btnEditar.Text = "Actualizar";
+            btnEditar.UseVisualStyleBackColor = true;
+            btnEditar.Click += btnEditar_Click;
+            // 
+            // rbGrupoAcademico
+            // 
+            rbGrupoAcademico.AutoSize = true;
+            rbGrupoAcademico.Font = new Font("Century Gothic", 18F);
+            rbGrupoAcademico.Location = new Point(82, 824);
+            rbGrupoAcademico.Name = "rbGrupoAcademico";
+            rbGrupoAcademico.Size = new Size(256, 34);
+            rbGrupoAcademico.TabIndex = 17;
+            rbGrupoAcademico.TabStop = true;
+            rbGrupoAcademico.Text = "Grupo Academico";
+            rbGrupoAcademico.UseVisualStyleBackColor = true;
+            // 
+            // rbGrupoCultural
+            // 
+            rbGrupoCultural.AutoSize = true;
+            rbGrupoCultural.Font = new Font("Century Gothic", 18F);
+            rbGrupoCultural.Location = new Point(344, 824);
+            rbGrupoCultural.Name = "rbGrupoCultural";
+            rbGrupoCultural.Size = new Size(206, 34);
+            rbGrupoCultural.TabIndex = 18;
+            rbGrupoCultural.TabStop = true;
+            rbGrupoCultural.Text = "Grupo Cultural";
+            rbGrupoCultural.UseVisualStyleBackColor = true;
+            // 
+            // label13
+            // 
+            label13.AutoSize = true;
+            label13.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            label13.Location = new Point(49, 565);
+            label13.Name = "label13";
+            label13.Size = new Size(114, 30);
+            label13.TabIndex = 44;
+            label13.Text = "Atendió:";
+            // 
+            // txtAtendio
+            // 
+            txtAtendio.Font = new Font("Century Gothic", 18F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            txtAtendio.Location = new Point(169, 562);
+            txtAtendio.Name = "txtAtendio";
+            txtAtendio.Size = new Size(374, 37);
+            txtAtendio.TabIndex = 43;
+            // 
             // Principal
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1137, 791);
+            ClientSize = new Size(1137, 728);
+            Controls.Add(label13);
+            Controls.Add(txtAtendio);
+            Controls.Add(btnEditar);
             Controls.Add(btnVaciarLocker);
             Controls.Add(label11);
             Controls.Add(label12);
@@ -587,8 +622,6 @@
         private ComboBox cbUbicacion;
         private DataGridView dataGridView1;
         private Label label2;
-        private RadioButton rbGrupoCultural;
-        private RadioButton rbGrupoAcademico;
         private Label label4;
         private Label label5;
         private Label label6;
@@ -613,5 +646,10 @@
         private Label label11;
         private Label label12;
         private Button btnVaciarLocker;
+        private Button btnEditar;
+        private RadioButton rbGrupoAcademico;
+        private RadioButton rbGrupoCultural;
+        private Label label13;
+        private TextBox txtAtendio;
     }
 }

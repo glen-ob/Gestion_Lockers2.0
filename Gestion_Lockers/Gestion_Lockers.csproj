@@ -13,7 +13,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="Data\LockersV1.0.db">
+        <Content Include="Data\LockersV2.0.db">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
         </Content>

@@ -27,6 +27,8 @@ namespace Gestion_Lockers
             dgvLockers.Columns["Nombre"].HeaderText = "Nombre";
             dgvLockers.Columns["Matricula"].HeaderText = "Matrícula";
             dgvLockers.Columns["Telefono"].HeaderText = "Teléfono";
+            dgvLockers.Columns["Carrera"].HeaderText = "Carrera";
+            dgvLockers.Columns["Atendio"].HeaderText = "Atendió";
 
             // Ajustar el ancho de las columnas
             dgvLockers.AutoResizeColumns();
@@ -64,14 +66,12 @@ namespace Gestion_Lockers
             // 
             // dgvLockers
             // 
+            dgvLockers.AllowDrop = true;
             dgvLockers.AllowUserToAddRows = false;
             dgvLockers.AllowUserToDeleteRows = false;
-            dgvLockers.AllowUserToResizeColumns = false;
-            dgvLockers.AllowUserToResizeRows = false;
             dgvLockers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvLockers.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dgvLockers.Enabled = false;
-            dgvLockers.Location = new Point(41, 41);
+            dgvLockers.Location = new Point(52, 41);
             dgvLockers.Name = "dgvLockers";
             dgvLockers.RowHeadersWidth = 51;
             dgvLockers.Size = new Size(822, 244);

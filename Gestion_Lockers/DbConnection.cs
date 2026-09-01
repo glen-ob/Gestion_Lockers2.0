@@ -13,13 +13,13 @@ namespace Gestion_Lockers
             // Busca la BD en la carpeta Data/ relativa al ejecutable.
             // Funciona tanto en desarrollo (bin/Debug) como en producción (publish/).
             string carpetaEjecutable = AppDomain.CurrentDomain.BaseDirectory;
-            string rutaDB = Path.Combine(carpetaEjecutable, "Data", "LockersV1.0.db");
+            string rutaDB = Path.Combine(carpetaEjecutable, "Data", "LockersV2.0.db");
 
             if (!File.Exists(rutaDB))
             {
                 throw new FileNotFoundException(
                     $"No se encontró la base de datos en:\n{rutaDB}\n\n" +
-                    "Verifica que el archivo LockersV1.0.db esté en la carpeta Data/ " +
+                    "Verifica que el archivo LockersV2.0.db esté en la carpeta Data/ " +
                     "junto al ejecutable.",
                     rutaDB);
             }

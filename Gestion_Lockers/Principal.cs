@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data.SQLite;
 using System.Diagnostics;
 using System.Drawing;
@@ -6,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Microsoft.VisualBasic.Logging;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using static Gestion_Lockers.Funciones;
 
 namespace Gestion_Lockers
 {
@@ -15,6 +17,7 @@ namespace Gestion_Lockers
         private int currentUserId;
         private string currentUser = string.Empty;
         private string currentUserRole = string.Empty;
+        private string atendidoPor = string.Empty;
 
         private readonly Diccionario diccionario = new Diccionario();
 
@@ -228,7 +231,7 @@ namespace Gestion_Lockers
 
                 if (confirm == DialogResult.Yes)
                 {
-                    if (Funciones.EjecutarRenovacion(_matriculaEnRenovacion!, _lockerAnteriorRenovacion!, idLocker))
+                    if (Funciones.EjecutarRenovacion(_matriculaEnRenovacion!, _lockerAnteriorRenovacion!, idLocker, _atendido_por))
                     {
                         MessageBox.Show("Renovación con cambio de locker realizada correctamente.", "Éxito",
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -261,6 +264,28 @@ namespace Gestion_Lockers
                 TXTNombre.Text = info.Nombre;
                 txtMatricula.Text = info.Matricula;
                 txtTelefono.Text = info.Telefono;
+                //cbCarrera.SelectedItem = info.Carrera;
+                txtAtendio.Text = info.Atendio;
+
+                // Asignar la carrera al combobox usando IdCarrera
+                if (info.IdCarrera.HasValue)
+                {
+                    var carreraSeleccionada = ((List<CarreraItem>)cbCarrera.DataSource)
+                        .FirstOrDefault(c => c.IdCarrera == info.IdCarrera.Value);
+
+                    if (carreraSeleccionada != null)
+                    {
+                        cbCarrera.SelectedItem = carreraSeleccionada;
+                    }
+                    else
+                    {
+                        cbCarrera.SelectedIndex = 0; // "-- Sin especificar --"
+                    }
+                }
+                else
+                {
+                    cbCarrera.SelectedIndex = 0; // "-- Sin especificar --"
+                }
             }
             else
             {
@@ -306,8 +331,8 @@ namespace Gestion_Lockers
             if (formSeleccion.ShowDialog() == DialogResult.OK)
             {
                 var lockerSeleccionado = formSeleccion.LockerSeleccionado;
-                MostrarInfoLocker(lockerSeleccionado.IdLocker); 
-                ResaltarLockerEnGrid(lockerSeleccionado.IdLocker); 
+                MostrarInfoLocker(lockerSeleccionado.IdLocker);
+                ResaltarLockerEnGrid(lockerSeleccionado.IdLocker);
             }
         }
 
@@ -367,7 +392,7 @@ namespace Gestion_Lockers
         // ─────────────────────────────────────────────
 
         private void BtnAsignar_Click(object? sender, EventArgs e)
-        { 
+        {
             string nombre = TXTNombre.Text.Trim();
             string telefono = txtTelefono.Text.Trim();
             string matricula = txtMatricula.Text.Trim();
@@ -417,11 +442,22 @@ namespace Gestion_Lockers
                 return;
             }
 
-            // Carrera seleccionada (opcional)
+            // Carrera seleccionada 
             var carreraSel = cbCarrera.SelectedItem as Funciones.CarreraItem;
-
+            if (carreraSel == null)
+            {
+                MessageBox.Show("Seleccione una carrera antes de asignar.",
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             bool grupoAcademico = rbGrupoAcademico?.Checked ?? false;
             bool grupoCultural = rbGrupoCultural?.Checked ?? false;
+
+            if (string.IsNullOrWhiteSpace(txtAtendio.Text))
+            {
+                MessageBox.Show("Debes ingresar quien está atendiendo actualmente.");
+                return;
+            }
 
             if ((grupoAcademico || grupoCultural) && !EsAdmin())
             {
@@ -488,13 +524,17 @@ namespace Gestion_Lockers
                 }
 
                 using var insAsig = new SQLiteCommand(@"
-                    INSERT INTO asignaciones (matricula, id_locker, fecha_inicio, fecha_fin, activa, id_precio, monto_pagado)
-                    VALUES (@mat, @id, date('now'), NULL, 1, @precio, @monto);", conn, tran);
+                    INSERT INTO asignaciones (matricula, id_locker, fecha_inicio, fecha_fin, activa, id_precio, monto_pagado, atendido_por)
+                    VALUES (@mat, @id, date('now'), NULL, 1, @precio, @monto, @atendidoPor);", conn, tran);
                 insAsig.Parameters.AddWithValue("@mat", matricula);
                 insAsig.Parameters.AddWithValue("@id", selectedLockerId.Value);
                 insAsig.Parameters.AddWithValue("@precio", precioSel.IdPrecio);
                 insAsig.Parameters.AddWithValue("@monto", (double)precioSel.Monto);
-                insAsig.ExecuteNonQuery();
+                insAsig.Parameters.AddWithValue("@atendidoPor", txtAtendio.Text); 
+
+                int rowsAffected = insAsig.ExecuteNonQuery();
+                Console.WriteLine($"Filas afectadas: {rowsAffected}"); // Depuración
+                Console.WriteLine($"ID Carrera seleccionada: {carreraSel.IdCarrera}");
 
                 using var updLocker = new SQLiteCommand(
                     "UPDATE lockers SET estado = 'Ocupado' WHERE id_locker = @id;", conn, tran);
@@ -502,6 +542,8 @@ namespace Gestion_Lockers
                 updLocker.ExecuteNonQuery();
 
                 tran.Commit();
+                Console.WriteLine("Transacción confirmada."); // Depuración
+
             }
             catch (Exception ex)
             {
@@ -527,6 +569,7 @@ namespace Gestion_Lockers
         private bool _modoSeleccionRenovacion = false;
         private string? _matriculaEnRenovacion = null;
         private string? _lockerAnteriorRenovacion = null;
+        private string? _atendido_por = null;
 
         private void BtnRenovar_Click(object? sender, EventArgs e)
         {
@@ -548,6 +591,7 @@ namespace Gestion_Lockers
             // ── Paso 2: obtener alumno asignado al locker ───────────────────
             string idLockerStr = selectedLockerId.Value.ToString();
             string? matricula = Funciones.ObtenerMatriculaPorLocker(idLockerStr);
+            string atendido_por = selectedLockerId.Value.ToString();
 
             if (string.IsNullOrEmpty(matricula))
             {
@@ -578,7 +622,7 @@ namespace Gestion_Lockers
             // ── Paso 4: mismo locker o diferente ───────────────────────────
             if (dlg.MismoLocker)
             {
-                if (Funciones.EjecutarRenovacion(matricula, idLockerStr, selectedLockerId.Value))
+                if (Funciones.EjecutarRenovacion(matricula, idLockerStr, selectedLockerId.Value, atendido_por))
                 {
                     MessageBox.Show("Renovación realizada correctamente.", "Éxito",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -755,14 +799,31 @@ namespace Gestion_Lockers
             if (cbPrecio.Items.Count > 0) cbPrecio.SelectedIndex = 0;
         }
 
+        //private void CargarComboCarrera()
+        //{
+        //    cbCarrera.Items.Clear();
+        //    cbCarrera.Items.Add("— Sin especificar —");
+        //    foreach (var c in Funciones.CargarCarreras())
+        //        cbCarrera.Items.Add(c);
+        //    cbCarrera.SelectedIndex = 0;
+        //}
+
         private void CargarComboCarrera()
         {
             cbCarrera.Items.Clear();
-            cbCarrera.Items.Add("— Sin especificar —");
-            foreach (var c in Funciones.CargarCarreras())
-                cbCarrera.Items.Add(c);
+            var carreras = Funciones.CargarCarreras();
+
+            var listaConOpcionDefault = new List<CarreraItem>();
+            listaConOpcionDefault.Add(new CarreraItem(0, "— Sin especificar —"));
+            listaConOpcionDefault.AddRange(carreras);
+
+            cbCarrera.DisplayMember = "Nombre";  // propiedad a mostrar
+            cbCarrera.ValueMember = "IdCarrera"; // valor a usar
+            cbCarrera.DataSource = listaConOpcionDefault;
+
             cbCarrera.SelectedIndex = 0;
         }
+
 
         private bool EsAdmin()
             => !string.IsNullOrEmpty(currentUserRole)
@@ -795,6 +856,8 @@ namespace Gestion_Lockers
             TXTNombre.Clear();
             txtMatricula.Clear();
             txtTelefono.Clear();
+            txtAtendio.Clear();
+            //cbCarrera.Items.Clear();
             if (rbGrupoAcademico != null) rbGrupoAcademico.Checked = false;
             if (rbGrupoCultural != null) rbGrupoCultural.Checked = false;
         }
@@ -882,12 +945,12 @@ namespace Gestion_Lockers
                     cmdDelete.Parameters.AddWithValue("@idLocker", selectedLockerId.Value);
                     int rowsAffected = cmdDelete.ExecuteNonQuery();
 
-                using (var cmdUpdateEstado = new SQLiteCommand(
-                    "UPDATE lockers SET estado = 'Disponible' WHERE id_locker = @idLocker;", conn, tran))
-                {
-                    cmdUpdateEstado.Parameters.AddWithValue("@idLocker", selectedLockerId.Value);
-                    cmdUpdateEstado.ExecuteNonQuery();
-                }
+                    using (var cmdUpdateEstado = new SQLiteCommand(
+                        "UPDATE lockers SET estado = 'Disponible' WHERE id_locker = @idLocker;", conn, tran))
+                    {
+                        cmdUpdateEstado.Parameters.AddWithValue("@idLocker", selectedLockerId.Value);
+                        cmdUpdateEstado.ExecuteNonQuery();
+                    }
 
                     if (rowsAffected > 0)
                     {
@@ -903,12 +966,12 @@ namespace Gestion_Lockers
                             diccionario.estadosLockers.Add(lockerId, "Disponible");
                         }
                         MessageBox.Show($"Estado del locker {lockerId}: {diccionario.estadosLockers[lockerId]}");
-              
+
 
                         MessageBox.Show("El registro de asignación ha sido eliminado correctamente.",
                             "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
-          ApplyEstadosEnGrid(); 
-                        RefrescarMapa(); 
+                        ApplyEstadosEnGrid();
+                        RefrescarMapa();
                         LimpiarLabels();
                         LimpiarCamposAlumno();
                         txtBusquedaNombre.Clear();
@@ -926,6 +989,76 @@ namespace Gestion_Lockers
                 MessageBox.Show($"Error al cancelar la renovación: {ex.Message}",
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void btnEditar_Click(object sender, EventArgs e)
+        {
+            // Obtener los valores actualizados (ejemplo)
+            string nuevoNombre = TXTNombre.Text.Trim();
+            string nuevaMatricula = txtMatricula.Text.Trim();
+            string nuevoTelefono = txtTelefono.Text.Trim();
+            int idLocker = selectedLockerId.Value;
+
+            if (!selectedLockerId.HasValue)
+            {
+                MessageBox.Show("Busque o seleccione el locker del alumno que desea editar.",
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+
+            // Validar que los valores sean correctos
+            if (string.IsNullOrEmpty(nuevoNombre) && string.IsNullOrEmpty(nuevaMatricula) && string.IsNullOrEmpty(nuevoTelefono))
+            {
+                MessageBox.Show("La matrícula no puede estar vacía.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // Consulta SQL para actualizar los datos
+            string query = @"
+                UPDATE asignaciones
+                SET
+                    nombre = @nombre,
+                    matricula = @mat,
+                    telefono = @telefono,
+                WHERE id_locker = @idLocker";
+
+            try
+            {
+                using var conn = DBConnection.GetConnection();
+                using var tran = conn.BeginTransaction();
+
+                {
+                    conn.Open();
+                    using (var cmd = new SQLiteCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@nombre", nuevoNombre);
+                        cmd.Parameters.AddWithValue("@mat", nuevaMatricula);
+                        cmd.Parameters.AddWithValue("@telefono", nuevoTelefono);
+                        cmd.Parameters.AddWithValue("@idLocker", idLocker);
+
+                        int rowsAffected = cmd.ExecuteNonQuery();
+
+                        if (rowsAffected > 0)
+                        {
+                            MessageBox.Show("Locker actualizado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        else
+                        {
+                            MessageBox.Show("No se encontró el locker especificado.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al actualizar el locker: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void label13_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }

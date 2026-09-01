@@ -15,14 +15,16 @@ namespace Gestion_Lockers
         // Tipos de datos
         // ─────────────────────────────────────────────
 
-        public record AsignacionInfo(string Nombre, string Matricula, string Telefono);
+        public record AsignacionInfo(string Nombre, string Matricula, string Telefono, string Atendio, int? IdCarrera);
 
         public record BusquedaLockerInfo(
             int IdLocker,
             string Estado,
             string Nombre,
             string Matricula,
-            string Telefono);
+            string Telefono, 
+            string Atendio
+            );
 
         public record PrecioItem(int IdPrecio, string Nombre, decimal Monto)
         {
@@ -376,12 +378,12 @@ namespace Gestion_Lockers
                 if (int.TryParse(t, out int idNum))
                 {
                     const string sqlId = @"
-                        SELECT l.id_locker, l.estado,
+                        SELECT l.id_locker, l.estado, l.atendido_por,
                                COALESCE(al.nombre,    '') AS nombre,
                                COALESCE(al.matricula, '') AS matricula,
                                COALESCE(al.telefono,  '') AS telefono
                         FROM   lockers l
-                        LEFT JOIN asignaciones a  ON l.id_locker = a.id_locker AND a.activa = 1
+                        LEFT JOIN asignaciones a  ON l.id_locker = a.id_locker AND a.activa = 1 AND a.atendio = 1
                         LEFT JOIN alumnos      al ON a.matricula  = al.matricula
                         WHERE  l.id_locker = @id;";
                     using var cmd = new SQLiteCommand(sqlId, conn);
@@ -395,7 +397,9 @@ namespace Gestion_Lockers
                             r["estado"]?.ToString() ?? string.Empty,
                             r["nombre"]?.ToString() ?? string.Empty,
                             r["matricula"]?.ToString() ?? string.Empty,
-                            r["telefono"]?.ToString() ?? string.Empty));
+                            r["telefono"]?.ToString() ?? string.Empty,
+                            r["atendio"]?.ToString() ?? string.Empty
+                            ));
                     }
 
                     if (resultados.Count == 0)
@@ -405,7 +409,7 @@ namespace Gestion_Lockers
                     }
                     else if (resultados.Count > 1)
                     {
-                        MessageBox.Show($"Se encontraron {resultados.Count} lockers con el ID {idNum}. Se mostrará el primero.",
+                        MessageBox.Show($"Se encontraron {resultados.Count} lockers con el ID {idNum}.",
                             "Múltiples resultados", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
 
@@ -414,7 +418,7 @@ namespace Gestion_Lockers
 
                 // busca por nombre o matrícula (devuelve todos los resultados)
                 const string sqlNombre = @"
-                    SELECT l.id_locker, l.estado,
+                    SELECT l.id_locker, l.estado,  l.atendido_por,
                            al.nombre, al.matricula, al.telefono
                     FROM   asignaciones a
                     JOIN   alumnos al ON a.matricula = al.matricula
@@ -434,7 +438,9 @@ namespace Gestion_Lockers
                         r2["estado"]?.ToString() ?? string.Empty,
                         r2["nombre"]?.ToString() ?? string.Empty,
                         r2["matricula"]?.ToString() ?? string.Empty,
-                        r2["telefono"]?.ToString() ?? string.Empty));
+                        r2["telefono"]?.ToString() ?? string.Empty,
+                        r2["atendio"]?.ToString() ?? string.Empty
+                        ));
                 }
 
                 if (resultadosNombre.Count == 0)
@@ -444,7 +450,7 @@ namespace Gestion_Lockers
                 }
                 else if (resultadosNombre.Count > 1)
                 {
-                    MessageBox.Show($"Se encontraron {resultadosNombre.Count} lockers para '{t}'. Seleccione uno en la lista.",
+                    MessageBox.Show($"Se encontraron {resultadosNombre.Count} lockers para '{t}'.",
                         "Múltiples resultados", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
 
@@ -574,7 +580,7 @@ namespace Gestion_Lockers
             {
                 using var conn = DBConnection.GetConnection();
                 const string sql = @"
-                    SELECT al.nombre, al.matricula, al.telefono
+                    SELECT al.nombre, al.matricula, al.telefono, atendido_por, al.id_carrera
                     FROM   asignaciones a
                     JOIN   alumnos al ON a.matricula = al.matricula
                     WHERE  a.id_locker = @id AND a.activa = 1
@@ -586,7 +592,10 @@ namespace Gestion_Lockers
                     return new AsignacionInfo(
                         reader["nombre"]?.ToString() ?? string.Empty,
                         reader["matricula"]?.ToString() ?? string.Empty,
-                        reader["telefono"]?.ToString() ?? string.Empty);
+                        reader["telefono"]?.ToString() ?? string.Empty,
+                        reader["atendido_por"]?.ToString() ?? string.Empty,
+                        reader["id_carrera"] != DBNull.Value ? 
+                        Convert.ToInt32(reader["id_carrera"]) : (int?)null);
             }
             catch (Exception ex)
             {
@@ -635,7 +644,7 @@ namespace Gestion_Lockers
         /// en el locker destino (puede ser el mismo u otro distinto).
         /// Actualiza el estado de ambos lockers si cambian.
         /// </summary>
-        public static bool EjecutarRenovacion(string matricula, string lockerAnterior, int lockerNuevo)
+        public static bool EjecutarRenovacion(string matricula, string lockerAnterior, int lockerNuevo, string atendido_por)
         {
             try
             {
@@ -664,11 +673,12 @@ namespace Gestion_Lockers
 
                 // Crear nueva asignación en el locker nuevo
                 using (var ins = new SQLiteCommand(@"
-                    INSERT INTO asignaciones (matricula, id_locker, fecha_inicio, fecha_fin, activa)
-                    VALUES (@mat, @locker, date('now'), NULL, 1);", conn, tran))
+                    INSERT INTO asignaciones (matricula, id_locker, fecha_inicio, fecha_fin, activa, atendio)
+                    VALUES (@mat, @locker, date('now'), NULL, 1, @atendio);", conn, tran))
                 {
                     ins.Parameters.AddWithValue("@mat", matricula);
                     ins.Parameters.AddWithValue("@locker", lockerNuevo);
+                    ins.Parameters.AddWithValue("@atendio", atendido_por);
                     ins.ExecuteNonQuery();
                 }
 
