@@ -90,8 +90,6 @@
 
         #endregion
 
-        private TextBox textBox1;
-        private Button button1;
         private Button btnBuscar;
         private Label label1;
         private TextBox txtRenovacion;

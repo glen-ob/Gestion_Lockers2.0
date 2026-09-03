@@ -15,15 +15,14 @@ namespace Gestion_Lockers
         // Tipos de datos
         // ─────────────────────────────────────────────
 
-        public record AsignacionInfo(string Nombre, string Matricula, string Telefono, string Atendio, int? IdCarrera);
+        public record AsignacionInfo(string Nombre, string Telefono, string Atendio, int? IdCarrera, string Matricula);
 
         public record BusquedaLockerInfo(
             int IdLocker,
             string Estado,
             string Nombre,
             string Matricula,
-            string Telefono, 
-            string Atendio
+            string Telefono
             );
 
         public record PrecioItem(int IdPrecio, string Nombre, decimal Monto)
@@ -384,7 +383,7 @@ namespace Gestion_Lockers
                                COALESCE(al.telefono,  '') AS telefono
                         FROM   lockers l
                         LEFT JOIN asignaciones a  ON l.id_locker = a.id_locker AND a.activa = 1 AND a.atendio = 1
-                        LEFT JOIN alumnos      al ON a.matricula  = al.matricula
+                        LEFT JOIN alumnos      al ON a.id_alumno  = al.id_alumno
                         WHERE  l.id_locker = @id;";
                     using var cmd = new SQLiteCommand(sqlId, conn);
                     cmd.Parameters.AddWithValue("@id", idNum);
@@ -397,8 +396,7 @@ namespace Gestion_Lockers
                             r["estado"]?.ToString() ?? string.Empty,
                             r["nombre"]?.ToString() ?? string.Empty,
                             r["matricula"]?.ToString() ?? string.Empty,
-                            r["telefono"]?.ToString() ?? string.Empty,
-                            r["atendio"]?.ToString() ?? string.Empty
+                            r["telefono"]?.ToString() ?? string.Empty
                             ));
                     }
 
@@ -418,10 +416,10 @@ namespace Gestion_Lockers
 
                 // busca por nombre o matrícula (devuelve todos los resultados)
                 const string sqlNombre = @"
-                    SELECT l.id_locker, l.estado,  l.atendido_por,
+                    SELECT l.id_locker, l.estado,
                            al.nombre, al.matricula, al.telefono
                     FROM   asignaciones a
-                    JOIN   alumnos al ON a.matricula = al.matricula
+                    JOIN   alumnos al ON a.id_alumno = al.id_alumno
                     JOIN   lockers l  ON a.id_locker = l.id_locker
                     WHERE  a.activa = 1
                       AND  (al.nombre    LIKE @term COLLATE NOCASE
@@ -438,8 +436,7 @@ namespace Gestion_Lockers
                         r2["estado"]?.ToString() ?? string.Empty,
                         r2["nombre"]?.ToString() ?? string.Empty,
                         r2["matricula"]?.ToString() ?? string.Empty,
-                        r2["telefono"]?.ToString() ?? string.Empty,
-                        r2["atendio"]?.ToString() ?? string.Empty
+                        r2["telefono"]?.ToString() ?? string.Empty
                         ));
                 }
 
@@ -580,9 +577,9 @@ namespace Gestion_Lockers
             {
                 using var conn = DBConnection.GetConnection();
                 const string sql = @"
-                    SELECT al.nombre, al.matricula, al.telefono, atendido_por, al.id_carrera
+                    SELECT al.nombre, al.telefono, atendido_por, al.id_carrera, al.matricula
                     FROM   asignaciones a
-                    JOIN   alumnos al ON a.matricula = al.matricula
+                    JOIN   alumnos al ON a.id_alumno = al.id_alumno
                     WHERE  a.id_locker = @id AND a.activa = 1
                     LIMIT  1;";
                 using var cmd = new SQLiteCommand(sql, conn);
@@ -591,11 +588,11 @@ namespace Gestion_Lockers
                 if (reader.Read())
                     return new AsignacionInfo(
                         reader["nombre"]?.ToString() ?? string.Empty,
-                        reader["matricula"]?.ToString() ?? string.Empty,
                         reader["telefono"]?.ToString() ?? string.Empty,
                         reader["atendido_por"]?.ToString() ?? string.Empty,
-                        reader["id_carrera"] != DBNull.Value ? 
-                        Convert.ToInt32(reader["id_carrera"]) : (int?)null);
+                        reader["id_carrera"] != DBNull.Value ? Convert.ToInt32(reader["id_carrera"]) : (int?)null,
+                        reader["matricula"]?.ToString() ?? string.Empty
+);
             }
             catch (Exception ex)
             {
@@ -626,14 +623,14 @@ namespace Gestion_Lockers
         /// Devuelve el id_locker actual activo de un alumno, o null si no tiene.
         /// Devuelve el valor como string para soportar IDs alfanuméricos.
         /// </summary>
-        public static string? ObtenerLockerActivoPorMatricula(string matricula)
+        public static string? ObtenerLockerActivoPorMatricula(string id_alumno)
         {
             try
             {
                 using var conn = DBConnection.GetConnection();
                 using var cmd = new SQLiteCommand(
-                    "SELECT id_locker FROM asignaciones WHERE matricula = @mat AND activa = 1 LIMIT 1;", conn);
-                cmd.Parameters.AddWithValue("@mat", matricula);
+                    "SELECT id_locker FROM asignaciones WHERE id_alumno = @id AND activa = 1 LIMIT 1;", conn);
+                cmd.Parameters.AddWithValue("@id", id_alumno);
                 return cmd.ExecuteScalar()?.ToString();
             }
             catch { return null; }
@@ -644,7 +641,7 @@ namespace Gestion_Lockers
         /// en el locker destino (puede ser el mismo u otro distinto).
         /// Actualiza el estado de ambos lockers si cambian.
         /// </summary>
-        public static bool EjecutarRenovacion(string matricula, string lockerAnterior, int lockerNuevo, string atendido_por)
+        public static bool EjecutarRenovacion(string id_alumno, string lockerAnterior, int lockerNuevo, string atendido_por)
         {
             try
             {
@@ -654,10 +651,10 @@ namespace Gestion_Lockers
                 // Cerrar asignación anterior
                 using (var cmd = new SQLiteCommand(@"
                     UPDATE asignaciones SET activa = 0, fecha_fin = date('now')
-                    WHERE  matricula = @mat AND id_locker = @lockerViejo AND activa = 1;",
+                    WHERE  id_alumno = @id AND id_locker = @lockerViejo AND activa = 1;",
                     conn, tran))
                 {
-                    cmd.Parameters.AddWithValue("@mat", matricula);
+                    cmd.Parameters.AddWithValue("@id", id_alumno);
                     cmd.Parameters.AddWithValue("@lockerViejo", lockerAnterior);
                     cmd.ExecuteNonQuery();
                 }
@@ -673,10 +670,10 @@ namespace Gestion_Lockers
 
                 // Crear nueva asignación en el locker nuevo
                 using (var ins = new SQLiteCommand(@"
-                    INSERT INTO asignaciones (matricula, id_locker, fecha_inicio, fecha_fin, activa, atendio)
-                    VALUES (@mat, @locker, date('now'), NULL, 1, @atendio);", conn, tran))
+                    INSERT INTO asignaciones (id_alumno, id_locker, fecha_inicio, fecha_fin, activa, atendio)
+                    VALUES (@id, @locker, date('now'), NULL, 1, @atendio);", conn, tran))
                 {
-                    ins.Parameters.AddWithValue("@mat", matricula);
+                    ins.Parameters.AddWithValue("@id", id_alumno);
                     ins.Parameters.AddWithValue("@locker", lockerNuevo);
                     ins.Parameters.AddWithValue("@atendio", atendido_por);
                     ins.ExecuteNonQuery();
@@ -701,22 +698,22 @@ namespace Gestion_Lockers
             }
         }
 
-        public static bool ExisteAlumno(string matricula, SQLiteConnection conn)
+        public static bool ExisteAlumno(string id_alumno, SQLiteConnection conn)
         {
             using var cmd = new SQLiteCommand(
-                "SELECT COUNT(1) FROM alumnos WHERE matricula = @mat LIMIT 1;", conn);
-            cmd.Parameters.AddWithValue("@mat", matricula);
+                "SELECT COUNT(1) FROM alumnos WHERE id_alumno = @id LIMIT 1;", conn);
+            cmd.Parameters.AddWithValue("@id", id_alumno);
             return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
         }
 
-        public static bool AlumnoTieneAsignacionActiva(string matricula)
+        public static bool AlumnoTieneAsignacionActiva(string id_alumno)
         {
             try
             {
                 using var conn = DBConnection.GetConnection();
                 using var cmd = new SQLiteCommand(
-                    "SELECT COUNT(1) FROM asignaciones WHERE matricula = @mat AND activa = 1;", conn);
-                cmd.Parameters.AddWithValue("@mat", matricula);
+                    "SELECT COUNT(1) FROM asignaciones WHERE id_alumno = @id AND activa = 1;", conn);
+                cmd.Parameters.AddWithValue("@id", id_alumno);
                 return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
             }
             catch { return false; }
@@ -868,13 +865,13 @@ namespace Gestion_Lockers
         // Actualizar alumno con carrera
         // ─────────────────────────────────────────────
 
-        public static void ActualizarCarreraAlumno(string matricula, int idCarrera)
+        public static void ActualizarCarreraAlumno(string id_alumno, int idCarrera)
         {
             using var conn = DBConnection.GetConnection();
             using var cmd = new SQLiteCommand(
-                "UPDATE alumnos SET id_carrera = @c WHERE matricula = @m;", conn);
+                "UPDATE alumnos SET id_carrera = @c WHERE id_alumno = @id;", conn);
             cmd.Parameters.AddWithValue("@c", idCarrera);
-            cmd.Parameters.AddWithValue("@m", matricula);
+            cmd.Parameters.AddWithValue("@id", id_alumno);
             cmd.ExecuteNonQuery();
         }
 
@@ -896,26 +893,26 @@ namespace Gestion_Lockers
                     l.piso,
                     l.zona,
                     al.nombre,
-                    al.matricula,
+                    al.id_alumno,
                     al.telefono,
                     COALESCE(c.nombre, '') AS carrera,
                     a.fecha_inicio,
                     (SELECT MAX(a2.fecha_inicio)
                      FROM asignaciones a2
-                     WHERE a2.matricula = a.matricula
+                     WHERE a2.id_alumno = a.id_alumno
                        AND a2.id_locker = a.id_locker
                        AND a2.activa = 0) AS ultima_renovacion,
                     (SELECT COUNT(*)
                      FROM asignaciones a3
-                     WHERE a3.matricula = a.matricula
+                     WHERE a3.id_alumno = a.id_alumno
                        AND a3.activa = 0) AS periodos_renovados,
                     COALESCE(p.nombre, '') AS precio_nombre,
                     COALESCE(a.monto_pagado, 0) AS monto_pagado,
                     (SELECT COALESCE(SUM(a4.monto_pagado), 0)
                      FROM asignaciones a4
-                     WHERE a4.matricula = a.matricula) AS total_acumulado
+                     WHERE a4.id_alumno = a.id_alumno) AS total_acumulado
                 FROM asignaciones a
-                JOIN alumnos al ON a.matricula = al.matricula
+                JOIN alumnos al ON a.id_alumno = al.id_alumno
                 JOIN lockers  l  ON a.id_locker = l.id_locker
                 LEFT JOIN carreras c ON al.id_carrera = c.id_carrera
                 LEFT JOIN precios  p ON a.id_precio   = p.id_precio
@@ -956,7 +953,7 @@ namespace Gestion_Lockers
         /// Actualiza nombre, teléfono y carrera del alumno.
         /// Se usa durante el flujo de renovación para permitir correcciones.
         /// </summary>
-        public static void ActualizarDatosAlumno(string matricula, string nombre, string telefono, int? idCarrera)
+        public static void ActualizarDatosAlumno(string id_alumno, string nombre, string telefono, int? idCarrera)
         {
             using var conn = DBConnection.GetConnection();
             using var cmd = new SQLiteCommand(@"
@@ -964,11 +961,11 @@ namespace Gestion_Lockers
                 SET nombre    = @nombre,
                     telefono  = @telefono,
                     id_carrera = @carrera
-                WHERE matricula = @mat;", conn);
+                WHERE id_alumno = @id;", conn);
             cmd.Parameters.AddWithValue("@nombre", nombre);
             cmd.Parameters.AddWithValue("@telefono", telefono);
             cmd.Parameters.AddWithValue("@carrera", idCarrera.HasValue ? (object)idCarrera.Value : DBNull.Value);
-            cmd.Parameters.AddWithValue("@mat", matricula);
+            cmd.Parameters.AddWithValue("@id", id_alumno);
             cmd.ExecuteNonQuery();
         }
 

@@ -44,14 +44,14 @@ namespace Gestion_Lockers
             }
         }
 
-        private void CargarAlumno(string matricula)
+        private void CargarAlumno(string id_alumno)
         {
             try
             {
                 using (var conn = DBConnection.GetConnection())
-                using (var cmd = new SQLiteCommand("SELECT nombre, telefono, grupo_academico, grupo_cultural FROM alumnos WHERE matricula = @mat LIMIT 1;", conn))
+                using (var cmd = new SQLiteCommand("SELECT nombre, telefono, grupo_academico, grupo_cultural FROM alumnos WHERE id_alumno = @id LIMIT 1;", conn))
                 {
-                    cmd.Parameters.AddWithValue("@mat", matricula);
+                    cmd.Parameters.AddWithValue("@id", id_alumno);
                     using (var dr = cmd.ExecuteReader())
                     {
                         if (dr.Read())
@@ -77,6 +77,7 @@ namespace Gestion_Lockers
             string nombre = textBox1.Text.Trim();    // Nombre
             string telefono = textBox2.Text.Trim();  // Teléfono
             string matricula = textBox3.Text.Trim(); // Matrícula
+            string? id_alumno = string.Empty;
 
             // Validaciones básicas
             if (string.IsNullOrEmpty(nombre) || string.IsNullOrEmpty(matricula) || string.IsNullOrEmpty(telefono))
@@ -109,9 +110,9 @@ namespace Gestion_Lockers
                 if (IsEditMode)
                 {
                     using (var conn = DBConnection.GetConnection())
-                    using (var cmd = new SQLiteCommand("UPDATE alumnos SET nombre=@nombre, telefono=@telefono, grupo_academico=@gAcad, grupo_cultural=@gCult WHERE matricula=@matricula;", conn))
+                    using (var cmd = new SQLiteCommand("UPDATE alumnos SET nombre=@nombre, telefono=@telefono, grupo_academico=@gAcad, grupo_cultural=@gCult WHERE id_alumno=@id;", conn))
                     {
-                        cmd.Parameters.AddWithValue("@matricula", matricula);
+                        cmd.Parameters.AddWithValue("@id", id_alumno);
                         cmd.Parameters.AddWithValue("@nombre", nombre);
                         cmd.Parameters.AddWithValue("@telefono", telefono);
                         cmd.Parameters.AddWithValue("@gAcad", grupoAcademico);

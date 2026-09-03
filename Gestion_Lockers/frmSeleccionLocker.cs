@@ -27,8 +27,6 @@ namespace Gestion_Lockers
             dgvLockers.Columns["Nombre"].HeaderText = "Nombre";
             dgvLockers.Columns["Matricula"].HeaderText = "Matrícula";
             dgvLockers.Columns["Telefono"].HeaderText = "Teléfono";
-            dgvLockers.Columns["Carrera"].HeaderText = "Carrera";
-            dgvLockers.Columns["Atendio"].HeaderText = "Atendió";
 
             // Ajustar el ancho de las columnas
             dgvLockers.AutoResizeColumns();
@@ -87,8 +85,5 @@ namespace Gestion_Lockers
         }
 
         private DataGridView dgvLockers;
-        private Label lblSelect;
-        private Button btnSeleccionar;
-        private Button btnCancelar;
     }
 }

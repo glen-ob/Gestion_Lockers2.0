@@ -617,7 +617,6 @@
         private Label lblFechaRenovacion;
         private Label label3;
         private Label lblFecha;
-        private Label lblUsuario;
         private ToolStripMenuItem cancelarRenovacionToolStripMenuItem;
         private ComboBox cbUbicacion;
         private DataGridView dataGridView1;

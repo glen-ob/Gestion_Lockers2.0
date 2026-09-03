@@ -1,19 +1,21 @@
-﻿using System;
+﻿using Microsoft.VisualBasic.Logging;
+using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.Diagnostics;
 using System.Drawing;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
-using Microsoft.VisualBasic.Logging;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using static Gestion_Lockers.Funciones;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.Rebar;
 
 namespace Gestion_Lockers
 {
     public partial class Principal : Form
     {
         private int? selectedLockerId = null;
+        private string? alumnoId = string.Empty;
         private int currentUserId;
         private string currentUser = string.Empty;
         private string currentUserRole = string.Empty;
@@ -397,7 +399,7 @@ namespace Gestion_Lockers
             string telefono = txtTelefono.Text.Trim();
             string matricula = txtMatricula.Text.Trim();
             string carrera = cbCarrera.Text.Trim();
-
+            string id_alumno = alumnoId;
             if (string.IsNullOrEmpty(nombre) || string.IsNullOrEmpty(matricula) || string.IsNullOrEmpty(telefono) || string.IsNullOrEmpty(carrera))
             {
                 MessageBox.Show("Todos los campos (Nombre, Matrícula, Teléfono y Carrera) son obligatorios.",
@@ -494,39 +496,40 @@ namespace Gestion_Lockers
                 bool gAcad = EsAdmin() && grupoAcademico;
                 bool gCult = EsAdmin() && grupoCultural;
 
-                if (Funciones.ExisteAlumno(matricula, conn))
+                if (Funciones.ExisteAlumno(id_alumno, conn))
                 {
                     using var upd = new SQLiteCommand(@"
                         UPDATE alumnos SET nombre=@nombre, telefono=@telefono,
                                grupo_academico=@gAcad, grupo_cultural=@gCult,
-                               id_carrera=@carrera
-                        WHERE matricula=@mat;", conn, tran);
+                               id_carrera=@carrera, matricula=@mat
+                        WHERE id_alumno=@id_alumno;", conn, tran);
                     upd.Parameters.AddWithValue("@nombre", nombre);
                     upd.Parameters.AddWithValue("@telefono", telefono);
                     upd.Parameters.AddWithValue("@gAcad", gAcad ? 1 : 0);
                     upd.Parameters.AddWithValue("@gCult", gCult ? 1 : 0);
                     upd.Parameters.AddWithValue("@carrera", carreraSel != null ? (object)carreraSel.IdCarrera : DBNull.Value);
                     upd.Parameters.AddWithValue("@mat", matricula);
+                    upd.Parameters.AddWithValue("@id_alumno", id_alumno);
                     upd.ExecuteNonQuery();
                 }
                 else
                 {
                     using var ins = new SQLiteCommand(@"
-                        INSERT INTO alumnos (matricula, nombre, telefono, grupo_academico, grupo_cultural, id_carrera)
-                        VALUES (@mat, @nombre, @telefono, @gAcad, @gCult, @carrera);", conn, tran);
-                    ins.Parameters.AddWithValue("@mat", matricula);
+                        INSERT INTO alumnos (nombre, telefono, grupo_academico, grupo_cultural, id_carrera, matricula)
+                        VALUES (@nombre, @telefono, @gAcad, @gCult, @carrera, @mat);", conn, tran);
                     ins.Parameters.AddWithValue("@nombre", nombre);
                     ins.Parameters.AddWithValue("@telefono", telefono);
                     ins.Parameters.AddWithValue("@gAcad", gAcad ? 1 : 0);
                     ins.Parameters.AddWithValue("@gCult", gCult ? 1 : 0);
                     ins.Parameters.AddWithValue("@carrera", carreraSel != null ? (object)carreraSel.IdCarrera : DBNull.Value);
+                    ins.Parameters.AddWithValue("@mat", matricula);
                     ins.ExecuteNonQuery();
                 }
 
                 using var insAsig = new SQLiteCommand(@"
-                    INSERT INTO asignaciones (matricula, id_locker, fecha_inicio, fecha_fin, activa, id_precio, monto_pagado, atendido_por)
-                    VALUES (@mat, @id, date('now'), NULL, 1, @precio, @monto, @atendidoPor);", conn, tran);
-                insAsig.Parameters.AddWithValue("@mat", matricula);
+                    INSERT INTO asignaciones (id_alumno, id_locker, fecha_inicio, fecha_fin, activa, id_precio, monto_pagado, atendido_por)
+                    VALUES (@id, @id, date('now'), NULL, 1, @precio, @monto, @atendidoPor);", conn, tran);
+                insAsig.Parameters.AddWithValue("@id", id_alumno);
                 insAsig.Parameters.AddWithValue("@id", selectedLockerId.Value);
                 insAsig.Parameters.AddWithValue("@precio", precioSel.IdPrecio);
                 insAsig.Parameters.AddWithValue("@monto", (double)precioSel.Monto);
@@ -993,67 +996,137 @@ namespace Gestion_Lockers
 
         private void btnEditar_Click(object sender, EventArgs e)
         {
-            // Obtener los valores actualizados (ejemplo)
-            string nuevoNombre = TXTNombre.Text.Trim();
-            string nuevaMatricula = txtMatricula.Text.Trim();
-            string nuevoTelefono = txtTelefono.Text.Trim();
-            int idLocker = selectedLockerId.Value;
-
-            if (!selectedLockerId.HasValue)
+            string? id_alumno = alumnoId;
+            string nombre = TXTNombre.Text.Trim();
+            string telefono = txtTelefono.Text.Trim();
+            string matricula = txtMatricula.Text.Trim();
+            string carrera = cbCarrera.Text.Trim();
+            string atendido_por = txtAtendio.Text.Trim();
+            string lockerId = selectedLockerId.HasValue ? selectedLockerId.Value.ToString() : string.Empty;
+            
+            if (string.IsNullOrEmpty(nombre) || string.IsNullOrEmpty(matricula) || string.IsNullOrEmpty(telefono) || string.IsNullOrEmpty(carrera))
             {
-                MessageBox.Show("Busque o seleccione el locker del alumno que desea editar.",
+                MessageBox.Show("Todos los campos (Nombre, Matrícula, Teléfono y Carrera) son obligatorios.",
                     "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-
-            // Validar que los valores sean correctos
-            if (string.IsNullOrEmpty(nuevoNombre) && string.IsNullOrEmpty(nuevaMatricula) && string.IsNullOrEmpty(nuevoTelefono))
+            if (!Regex.IsMatch(matricula, @"^[a-zA-Z0-9]+$"))
             {
-                MessageBox.Show("La matrícula no puede estar vacía.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("La matrícula solo puede contener caracteres alfanuméricos.",
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // Consulta SQL para actualizar los datos
-            string query = @"
-                UPDATE asignaciones
-                SET
-                    nombre = @nombre,
-                    matricula = @mat,
-                    telefono = @telefono,
-                WHERE id_locker = @idLocker";
+            if (!Regex.IsMatch(telefono, @"^\d{10}$"))
+            {
+                MessageBox.Show("El teléfono debe tener exactamente 10 dígitos.",
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (!selectedLockerId.HasValue)
+            {
+                MessageBox.Show("Seleccione un casillero por actualizar.",
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var precioSel = cbPrecio.SelectedItem as Funciones.PrecioItem;
+            if (precioSel == null)
+            {
+                MessageBox.Show("Seleccione un precio antes de asignar.",
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var carreraSel = cbCarrera.SelectedItem as Funciones.CarreraItem;
+            if (carreraSel == null)
+            {
+                MessageBox.Show("Seleccione una carrera antes de asignar.",
+                    "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            bool grupoAcademico = rbGrupoAcademico?.Checked ?? false;
+            bool grupoCultural = rbGrupoCultural?.Checked ?? false;
+
+            if (string.IsNullOrWhiteSpace(txtAtendio.Text))
+            {
+                MessageBox.Show("Debes ingresar quien está atendiendo actualmente.");
+                return;
+            }
+
+            if ((grupoAcademico || grupoCultural) && !EsAdmin())
+            {
+                var dr = MessageBox.Show(
+                    "Para asignar grupos académico/cultural se requiere inicio de sesión de administrador. ¿Desea continuar?",
+                    "Requiere administrador", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (dr != DialogResult.Yes) return;
+
+                using var login = new frm_Inicio();
+                if (login.ShowDialog(this) != DialogResult.OK
+                    || !login.UserRole.Equals("Administrador", StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show("Inicio de sesión fallido o usuario no es administrador.",
+                        "Permiso denegado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                currentUserId = login.UserId;
+                currentUser = login.UserName;
+                currentUserRole = login.UserRole;
+            }
 
             try
             {
                 using var conn = DBConnection.GetConnection();
                 using var tran = conn.BeginTransaction();
 
-                {
-                    conn.Open();
-                    using (var cmd = new SQLiteCommand(query, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@nombre", nuevoNombre);
-                        cmd.Parameters.AddWithValue("@mat", nuevaMatricula);
-                        cmd.Parameters.AddWithValue("@telefono", nuevoTelefono);
-                        cmd.Parameters.AddWithValue("@idLocker", idLocker);
+                bool gAcad = EsAdmin() && grupoAcademico;
+                bool gCult = EsAdmin() && grupoCultural;
+             
+                using var upd = new SQLiteCommand(@"
+                    UPDATE alumnos SET nombre=@nombre, telefono=@telefono,
+                            grupo_academico=@gAcad, grupo_cultural=@gCult,
+                            id_carrera=@carrera, matricula=@mat
+                    WHERE id_alumno = @id LIMIT 1;", conn, tran);
+                upd.Parameters.AddWithValue("@nombre", nombre);
+                upd.Parameters.AddWithValue("@telefono", telefono);
+                upd.Parameters.AddWithValue("@gAcad", gAcad ? 1 : 0);
+                upd.Parameters.AddWithValue("@gCult", gCult ? 1 : 0);
+                upd.Parameters.AddWithValue("@carrera", carreraSel != null ? (object)carreraSel.IdCarrera : DBNull.Value);
+                upd.Parameters.AddWithValue("@mat", matricula);
+                upd.Parameters.AddWithValue("@id", id_alumno);
+                upd.ExecuteNonQuery();
 
-                        int rowsAffected = cmd.ExecuteNonQuery();
 
-                        if (rowsAffected > 0)
-                        {
-                            MessageBox.Show("Locker actualizado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
-                        else
-                        {
-                            MessageBox.Show("No se encontró el locker especificado.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
-                    }
-                }
+                using var newAsig = new SQLiteCommand(@"
+                    UPDATE asignaciones 
+                    SET atendido_por = @atendido_por;", 
+                    conn, tran);
+
+                    newAsig.Parameters.AddWithValue("@atendido_por", atendido_por);
+                    newAsig.Parameters.AddWithValue("@id", lockerId);
+
+                newAsig.ExecuteNonQuery();
+
+                
+                tran.Commit();
+
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al actualizar el locker: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error realizando la actualización: {ex.Message}",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
+
+            MessageBox.Show("Asignación realizada correctamente.", "Éxito",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            RefrescarMapa();
+            LimpiarCamposAlumno();
+            LimpiarLabels();
+            txtBusquedaNombre.Clear();
         }
 
         private void label13_Click(object sender, EventArgs e)
