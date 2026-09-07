@@ -14,6 +14,8 @@ namespace Gestion_Lockers
         public string NombreActualizado { get; private set; } = string.Empty;
         public string TelefonoActualizado { get; private set; } = string.Empty;
         public int? IdCarreraSeleccionada { get; private set; } = null;
+        public string AtendidoPor { get; set; } = string.Empty;
+        public string? id_alumno { get; set; } = null;
         public bool MismoLocker { get; private set; } = true;
 
         // ── Controles ─────────────────────────────────────────────────────
@@ -26,11 +28,14 @@ namespace Gestion_Lockers
         private readonly Button btnCancelar;
 
         public frmDatosRenovacion(
+            string? id_alumno,
             string matricula,
             string nombre,
             string telefono,
+            int carrera,
             int idLocker)
         {
+            this.id_alumno = id_alumno;
             Text = "Renovación de locker";
             StartPosition = FormStartPosition.CenterParent;
             ClientSize = new System.Drawing.Size(480, 340);
@@ -59,7 +64,8 @@ namespace Gestion_Lockers
             var lblTel = new Label { Text = "Teléfono:", Font = font, Location = new System.Drawing.Point(12, 100), AutoSize = true };
             txtTelefono = new TextBox { Font = font, Location = new System.Drawing.Point(120, 96), Size = new System.Drawing.Size(200, 28), Text = telefono };
 
-            // Carrera
+
+            // Carrera - do NOT set SelectedIndex here (ComboBox not populated yet)
             var lblCarrera = new Label { Text = "Carrera:", Font = font, Location = new System.Drawing.Point(12, 142), AutoSize = true };
             cbCarrera = new ComboBox
             {
@@ -69,6 +75,10 @@ namespace Gestion_Lockers
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             CargarCarreras(matricula);
+            if (carrera >= 0 && carrera < cbCarrera.Items.Count)
+                cbCarrera.SelectedIndex = carrera;
+            else
+                cbCarrera.SelectedIndex = 0;
 
             // Separador
             var sep = new Label
@@ -147,8 +157,8 @@ namespace Gestion_Lockers
             {
                 using var conn = DBConnection.GetConnection();
                 using var cmd = new System.Data.SQLite.SQLiteCommand(
-                    "SELECT id_carrera FROM alumnos WHERE matricula = @m LIMIT 1;", conn);
-                cmd.Parameters.AddWithValue("@m", matricula);
+                    "SELECT id_carrera FROM alumnos WHERE id_alumno = @id LIMIT 1;", conn);
+                cmd.Parameters.AddWithValue("@id", id_alumno);
                 var obj = cmd.ExecuteScalar();
                 if (obj != null && obj != System.DBNull.Value)
                     idCarreraActual = Convert.ToInt32(obj);

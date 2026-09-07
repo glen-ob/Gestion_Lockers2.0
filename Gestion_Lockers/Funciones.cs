@@ -11,6 +11,8 @@ namespace Gestion_Lockers
 {
     public static class Funciones
     {
+        private static int saColCount;
+
         // ─────────────────────────────────────────────
         // Tipos de datos
         // ─────────────────────────────────────────────
@@ -39,16 +41,19 @@ namespace Gestion_Lockers
         // Configuración visual del DataGridView
         // ─────────────────────────────────────────────
 
+        // ConfigurarGridLockers — usa anchos fijos y evita wrap para IDs
         public static void ConfigurarGridLockers(DataGridView grid)
         {
             grid.DefaultCellStyle.Font = new Font("Century Gothic", 11F);
             grid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            grid.RowTemplate.Height = 34;
+            grid.DefaultCellStyle.WrapMode = DataGridViewTriState.False; // NO envolver por defecto (IDs en 1 línea)
+            grid.RowTemplate.Height = 56; // filas más altas
+            grid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None; // altura fija por RowTemplate
             grid.ColumnHeadersVisible = false;
             grid.RowHeadersVisible = false;
             grid.AllowUserToAddRows = false;
             grid.AllowUserToResizeRows = false;
-            grid.AllowUserToResizeColumns = false;
+            grid.AllowUserToResizeColumns = false; // permitir redimensionar columnas si el usuario lo desea
             grid.ReadOnly = true;
             grid.SelectionMode = DataGridViewSelectionMode.CellSelect;
             grid.MultiSelect = false;
@@ -83,7 +88,7 @@ namespace Gestion_Lockers
 
         /// <summary>
         /// Rellena el ComboBox con entradas jerárquicas Piso → Zona.
-        /// Las zonas se leen de la columna `zona` de la tabla lockers.
+        /// Las zonas se leen de la columna zona de la tabla lockers.
         /// </summary>
         public static void CargarZonasEnCombo(ComboBox cbUbicacion)
         {
@@ -142,6 +147,8 @@ namespace Gestion_Lockers
 
         public static void DibujarMapaPiso(DataGridView grid, Diccionario dic, int piso, string zona = "")
         {
+            grid.Visible = true;
+
             var numericos = new SortedDictionary<int, SortedSet<int>>();
             var alfanumericos = new List<string>();
 
@@ -208,11 +215,10 @@ namespace Gestion_Lockers
             }
             else
             {
-                // Si solo hay elementos alfanuméricos, necesitamos por lo menos 1 fila base y 0 cols.
                 totalFilas = 1;
             }
 
-            int colWidth = totalCols <= 60 ? 52 : 44;
+            int colWidth = 100; 
 
             grid.SuspendLayout();
             grid.DataSource = null;
@@ -222,10 +228,114 @@ namespace Gestion_Lockers
             for (int c = 0; c < totalCols; c++)
             {
                 grid.Columns.Add("col" + c, "");
-                grid.Columns[c].Width = colWidth;
+                var col = grid.Columns[c];
+                col.Width = Math.Max(100, colWidth);
+                col.MinimumWidth = 60;
+                col.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                col.DefaultCellStyle.WrapMode = DataGridViewTriState.False;
             }
 
-            // DataGridView arroja ArgumentOutOfRangeException si agregas 0 filas
+            int startColForSA = grid.Columns.Count;
+
+            if (alfanumericos.Count > 0)
+            {
+                if (alfanumericos.Count > 0 && numericos.Count == 0)
+                {
+                    var prefixes = new SortedSet<int>();
+                    var suffixes = new SortedSet<int>();
+                    var entries = new List<(int prefix, int suffix, string id)>();
+
+                    foreach (string id in alfanumericos)
+                    {
+                        // extraer la parte numérica al final
+                        int numStart = -1;
+                        for (int i = id.Length - 1; i >= 0; i--)
+                            if (!char.IsDigit(id[i])) { numStart = i + 1; break; }
+                        if (numStart < 0) numStart = 0;
+                        string numPart = id.Substring(numStart);
+                        if (!int.TryParse(numPart, out int num)) continue;
+
+                        int prefix = num / 100;   // ej. 3161 -> 31
+                        int suffix = num % 100;   // ej. 3161 -> 61
+
+                        prefixes.Add(prefix);
+                        suffixes.Add(suffix);
+                        entries.Add((prefix, suffix, id));
+                    }
+
+                    var prefixList = new List<int>(prefixes);
+                    var suffixList = new List<int>(suffixes);
+
+                    int saRows = prefixList.Count;
+                    int saCols = suffixList.Count;
+
+                    for (int sc = 0; sc < saCols; sc++)
+                    {
+                        grid.Columns.Add("sa" + sc, "");
+                        var saCol = grid.Columns[sc];
+                        saCol.Width = 110;
+                        saCol.MinimumWidth = 80;
+                        saCol.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                        saCol.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+                        saCol.DefaultCellStyle.WrapMode = DataGridViewTriState.False;
+                    }
+
+                    if (saRows > 0)
+                        grid.Rows.Add(saRows);
+
+                    foreach (var (prefix, suffix, id) in entries)
+                    {
+                        int r = prefixList.IndexOf(prefix);
+                        int c = suffixList.IndexOf(suffix);
+                        if (r >= 0 && c >= 0)
+                            grid.Rows[r].Cells[c].Value = id;
+                    }
+
+                    grid.RowHeadersVisible = false;
+                    grid.ResumeLayout();
+                    ApplyEstadosEnGrid(grid, dic);
+                    return; 
+                }
+
+                // separador
+                grid.Columns.Add("sep", "");
+                var sepCol = grid.Columns[startColForSA];
+                sepCol.Width = 10;
+                sepCol.MinimumWidth = 6;
+                sepCol.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                sepCol.DefaultCellStyle.WrapMode = DataGridViewTriState.False;
+                startColForSA++;
+
+                if (alfanumericos.Count > 0)
+                {
+                    var saGrid = OrganizarSAEnFilas(alfanumericos, totalFilas);
+                    int saColCount = saGrid.GetLength(1);
+                    int saStart = totalCols + 1; // totalCols numéricas + 1 sep
+                    for (int sc = 0; sc < saColCount; sc++)
+                    {
+                        grid.Columns.Add("sa" + sc, "");
+                        var saCol = grid.Columns[startColForSA + sc];
+                        saCol.Width = 150;
+                        saCol.MinimumWidth = 150;
+                        saCol.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                        saCol.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                        saCol.DefaultCellStyle.WrapMode = DataGridViewTriState.False;
+                    }
+                }
+
+                for (int sc = 0; sc < saColCount; sc++)
+                {
+                    grid.Columns.Add("sa" + sc, "");
+                    var saCol = grid.Columns[startColForSA + sc];
+                    saCol.Width = 150;
+                    saCol.MinimumWidth = 150;
+                    saCol.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                    saCol.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                    saCol.DefaultCellStyle.WrapMode = DataGridViewTriState.False;
+                }
+            }
+
             if (totalFilas > 0)
             {
                 grid.Rows.Add(totalFilas);
@@ -237,15 +347,12 @@ namespace Gestion_Lockers
             {
                 int fila = kvp.Key;
                 int filaBase = piso * 1000 + fila * 100;
-
-                // Reindexar: columna real → posición en el grid (offset por minColumna)
                 foreach (int col in kvp.Value)
                 {
                     int gridCol = col - minColumna;
                     if (gridCol >= 0 && gridCol < totalCols)
                         grid.Rows[rowIdx].Cells[gridCol].Value = (filaBase + col).ToString();
                 }
-
                 rowIdx++;
             }
 
@@ -253,27 +360,17 @@ namespace Gestion_Lockers
             {
                 var saGrid = OrganizarSAEnFilas(alfanumericos, totalFilas);
                 int saColCount = saGrid.GetLength(1);
-                int startCol = grid.Columns.Count;
-
-                grid.Columns.Add("sep", "");
-                grid.Columns[startCol].Width = 10;
-                startCol++;
-
-                for (int sc = 0; sc < saColCount; sc++)
-                {
-                    grid.Columns.Add("sa" + sc, "");
-                    grid.Columns[startCol + sc].Width = 110;
-                }
-
+                int saStart = totalCols + 1; // totalCols numéricas + 1 sep
                 for (int r = 0; r < totalFilas && r < saGrid.GetLength(0); r++)
                     for (int sc = 0; sc < saColCount; sc++)
                         if (saGrid[r, sc] != null)
-                            grid.Rows[r].Cells[startCol + sc].Value = saGrid[r, sc];
+                            grid.Rows[r].Cells[saStart + sc].Value = saGrid[r, sc];
             }
 
             grid.ResumeLayout();
             ApplyEstadosEnGrid(grid, dic);
         }
+
 
         private static string[,] OrganizarSAEnFilas(List<string> alfanumericos, int totalFilas)
         {
@@ -329,7 +426,7 @@ namespace Gestion_Lockers
             {
                 foreach (DataGridViewCell cell in row.Cells)
                 {
-                    string id = cell.Value?.ToString();
+                    string? id = cell.Value?.ToString(); // allow null
                     if (string.IsNullOrEmpty(id))
                     {
                         cell.Style.BackColor = grid.BackgroundColor;
@@ -364,6 +461,7 @@ namespace Gestion_Lockers
         /// Busca un locker por id numérico, nombre o matrícula del alumno asignado.
         /// Devuelve null si no encuentra resultado.
         /// </summary>
+        ///
         public static List<BusquedaLockerInfo> BuscarLockers(string termino)
         {
             if (string.IsNullOrWhiteSpace(termino)) return new List<BusquedaLockerInfo>();
@@ -373,48 +471,41 @@ namespace Gestion_Lockers
             {
                 using var conn = DBConnection.GetConnection();
 
-                // busca por id 
+                // colector de resultados por id_locker para evitar duplicados
+                var resultadosDict = new Dictionary<int, BusquedaLockerInfo>();
+
+                // 1) Si el término es numérico, buscar por id_locker (también puede devolver alumno si existe asignación activa)
                 if (int.TryParse(t, out int idNum))
                 {
                     const string sqlId = @"
-                        SELECT l.id_locker, l.estado, l.atendido_por,
+                        SELECT l.id_locker, l.estado,
                                COALESCE(al.nombre,    '') AS nombre,
                                COALESCE(al.matricula, '') AS matricula,
                                COALESCE(al.telefono,  '') AS telefono
                         FROM   lockers l
-                        LEFT JOIN asignaciones a  ON l.id_locker = a.id_locker AND a.activa = 1 AND a.atendio = 1
+                        LEFT JOIN asignaciones a  ON l.id_locker = a.id_locker AND a.activa = 1
                         LEFT JOIN alumnos      al ON a.id_alumno  = al.id_alumno
                         WHERE  l.id_locker = @id;";
                     using var cmd = new SQLiteCommand(sqlId, conn);
                     cmd.Parameters.AddWithValue("@id", idNum);
                     using var r = cmd.ExecuteReader();
-                    var resultados = new List<BusquedaLockerInfo>();
                     while (r.Read())
                     {
-                        resultados.Add(new BusquedaLockerInfo(
-                            Convert.ToInt32(r["id_locker"]),
-                            r["estado"]?.ToString() ?? string.Empty,
-                            r["nombre"]?.ToString() ?? string.Empty,
-                            r["matricula"]?.ToString() ?? string.Empty,
-                            r["telefono"]?.ToString() ?? string.Empty
-                            ));
+                        var idLocker = Convert.ToInt32(r["id_locker"]);
+                        if (!resultadosDict.ContainsKey(idLocker))
+                        {
+                            resultadosDict[idLocker] = new BusquedaLockerInfo(
+                                idLocker,
+                                r["estado"]?.ToString() ?? string.Empty,
+                                r["nombre"]?.ToString() ?? string.Empty,
+                                r["matricula"]?.ToString() ?? string.Empty,
+                                r["telefono"]?.ToString() ?? string.Empty
+                            );
+                        }
                     }
-
-                    if (resultados.Count == 0)
-                    {
-                        MessageBox.Show($"No se encontró el locker {idNum}.",
-                            "Sin resultados", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                    else if (resultados.Count > 1)
-                    {
-                        MessageBox.Show($"Se encontraron {resultados.Count} lockers con el ID {idNum}.",
-                            "Múltiples resultados", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
-
-                    return resultados;
                 }
 
-                // busca por nombre o matrícula (devuelve todos los resultados)
+                // 2) Buscar por nombre o matrícula (LIKE) — devuelve todas las asignaciones activas que coincidan
                 const string sqlNombre = @"
                     SELECT l.id_locker, l.estado,
                            al.nombre, al.matricula, al.telefono
@@ -428,36 +519,41 @@ namespace Gestion_Lockers
                 using var cmd2 = new SQLiteCommand(sqlNombre, conn);
                 cmd2.Parameters.AddWithValue("@term", "%" + t + "%");
                 using var r2 = cmd2.ExecuteReader();
-                var resultadosNombre = new List<BusquedaLockerInfo>();
                 while (r2.Read())
                 {
-                    resultadosNombre.Add(new BusquedaLockerInfo(
-                        Convert.ToInt32(r2["id_locker"]),
-                        r2["estado"]?.ToString() ?? string.Empty,
-                        r2["nombre"]?.ToString() ?? string.Empty,
-                        r2["matricula"]?.ToString() ?? string.Empty,
-                        r2["telefono"]?.ToString() ?? string.Empty
-                        ));
+                    var idLocker = Convert.ToInt32(r2["id_locker"]);
+                    if (!resultadosDict.ContainsKey(idLocker))
+                    {
+                        resultadosDict[idLocker] = new BusquedaLockerInfo(
+                            idLocker,
+                            r2["estado"]?.ToString() ?? string.Empty,
+                            r2["nombre"]?.ToString() ?? string.Empty,
+                            r2["matricula"]?.ToString() ?? string.Empty,
+                            r2["telefono"]?.ToString() ?? string.Empty
+                        );
+                    }
                 }
 
-                if (resultadosNombre.Count == 0)
+                var resultados = new List<BusquedaLockerInfo>(resultadosDict.Values);
+
+                if (resultados.Count == 0)
                 {
-                    MessageBox.Show($"No se encontró ningún alumno con '{t}'.",
+                    MessageBox.Show($"No se encontró ningún resultado para '{t}'.",
                         "Sin resultados", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
-                else if (resultadosNombre.Count > 1)
+                else if (resultados.Count > 1)
                 {
-                    MessageBox.Show($"Se encontraron {resultadosNombre.Count} lockers para '{t}'.",
+                    MessageBox.Show($"Se encontraron {resultados.Count} resultados para '{t}'.",
                         "Múltiples resultados", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
 
-                return resultadosNombre;
+                return resultados;
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error en búsqueda: " + ex.Message,
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return new List<BusquedaLockerInfo>(); // Devuelve una lista vacía en caso de error
+                return new List<BusquedaLockerInfo>();
             }
         }
 
@@ -612,11 +708,11 @@ namespace Gestion_Lockers
             {
                 using var conn = DBConnection.GetConnection();
                 using var cmd = new SQLiteCommand(
-                    "SELECT matricula FROM asignaciones WHERE id_locker = @id AND activa = 1 LIMIT 1;", conn);
+                    "SELECT id_alumno FROM asignaciones WHERE id_locker = @id AND activa = 1 LIMIT 1;", conn);
                 cmd.Parameters.AddWithValue("@id", idLocker);
                 return cmd.ExecuteScalar()?.ToString();
             }
-            catch { return null; }
+            catch { return null;}
         }
 
         /// <summary>
@@ -670,12 +766,12 @@ namespace Gestion_Lockers
 
                 // Crear nueva asignación en el locker nuevo
                 using (var ins = new SQLiteCommand(@"
-                    INSERT INTO asignaciones (id_alumno, id_locker, fecha_inicio, fecha_fin, activa, atendio)
-                    VALUES (@id, @locker, date('now'), NULL, 1, @atendio);", conn, tran))
+                    INSERT INTO asignaciones (id_alumno, id_locker, fecha_inicio, fecha_fin, activa, atendido_por)
+                    VALUES (@id, @locker, date('now'), NULL, 1, @atendido_por);", conn, tran))
                 {
                     ins.Parameters.AddWithValue("@id", id_alumno);
                     ins.Parameters.AddWithValue("@locker", lockerNuevo);
-                    ins.Parameters.AddWithValue("@atendio", atendido_por);
+                    ins.Parameters.AddWithValue("@atendido_por", atendido_por);
                     ins.ExecuteNonQuery();
                 }
 
@@ -893,6 +989,7 @@ namespace Gestion_Lockers
                     l.piso,
                     l.zona,
                     al.nombre,
+                    al.matricula,
                     al.id_alumno,
                     al.telefono,
                     COALESCE(c.nombre, '') AS carrera,

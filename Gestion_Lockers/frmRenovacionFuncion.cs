@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Data;
 using System.Data.SQLite;
 using System.Drawing;
@@ -17,13 +17,16 @@ namespace Gestion_Lockers
         private Button btnContinuar;
         private Label label1;
         private Button btnCancelar;
+        private string? alumnoId = string.Empty;
+        private Principal? _ownerPrincipal;
+
 
         public frmRenovacionFuncion(DataTable dt, string tableName)
         {
             this.table = dt ?? throw new ArgumentNullException(nameof(dt));
             this.tableName = tableName ?? "asignaciones";
 
-            Text = "Renovación - Resultados";
+            Text = "RenovaciÃ³n - Resultados";
             Size = new Size(800, 400);
             StartPosition = FormStartPosition.CenterParent;
 
@@ -43,6 +46,11 @@ namespace Gestion_Lockers
             InitializeComponent();
         }
 
+        public frmRenovacionFuncion(Principal owner) : this()
+        {
+            _ownerPrincipal = owner;
+        }
+
         private void InitializeComponent()
         {
             txtMatricula = new TextBox();
@@ -51,49 +59,53 @@ namespace Gestion_Lockers
             btnCancelar = new Button();
             SuspendLayout();
             // 
-            // label1
-            // 
-            label1.AutoSize = true;
-            label1.Font = new System.Drawing.Font("Century Gothic", 12F);
-            label1.Location = new System.Drawing.Point(12, 18);
-            label1.Name = "label1";
-            label1.Size = new System.Drawing.Size(144, 21);
-            label1.Text = "Ingrese matrícula:";
-            // 
             // txtMatricula
             // 
-            txtMatricula.Font = new System.Drawing.Font("Century Gothic", 12F);
-            txtMatricula.Location = new System.Drawing.Point(16, 50);
+            txtMatricula.Font = new Font("Century Gothic", 12F);
+            txtMatricula.Location = new Point(47, 50);
             txtMatricula.Name = "txtMatricula";
-            txtMatricula.Size = new System.Drawing.Size(260, 27);
+            txtMatricula.Size = new Size(260, 32);
+            txtMatricula.TabIndex = 1;
             // 
             // btnContinuar
             // 
-            btnContinuar.Font = new System.Drawing.Font("Century Gothic", 12F);
-            btnContinuar.Location = new System.Drawing.Point(16, 90);
+            btnContinuar.Font = new Font("Century Gothic", 12F);
+            btnContinuar.Location = new Point(47, 90);
             btnContinuar.Name = "btnContinuar";
-            btnContinuar.Size = new System.Drawing.Size(120, 35);
+            btnContinuar.Size = new Size(120, 35);
+            btnContinuar.TabIndex = 2;
             btnContinuar.Text = "Continuar";
             btnContinuar.Click += BtnContinuar_Click;
             // 
+            // label1
+            // 
+            label1.AutoSize = true;
+            label1.Font = new Font("Century Gothic", 12F);
+            label1.Location = new Point(43, 18);
+            label1.Name = "label1";
+            label1.Size = new Size(186, 23);
+            label1.TabIndex = 0;
+            label1.Text = "Ingrese matrÃ­cula:";
+            // 
             // btnCancelar
             // 
-            btnCancelar.Font = new System.Drawing.Font("Century Gothic", 12F);
-            btnCancelar.Location = new System.Drawing.Point(156, 90);
+            btnCancelar.Font = new Font("Century Gothic", 12F);
+            btnCancelar.Location = new Point(173, 90);
             btnCancelar.Name = "btnCancelar";
-            btnCancelar.Size = new System.Drawing.Size(120, 35);
+            btnCancelar.Size = new Size(134, 35);
+            btnCancelar.TabIndex = 3;
             btnCancelar.Text = "Cancelar";
-            btnCancelar.Click += (s, e) => this.Close();
+            btnCancelar.Click += btnCancelar_Click;
             // 
             // frmRenovacionFuncion
             // 
-            ClientSize = new System.Drawing.Size(300, 145);
+            ClientSize = new Size(352, 145);
             Controls.Add(label1);
             Controls.Add(txtMatricula);
             Controls.Add(btnContinuar);
             Controls.Add(btnCancelar);
             Name = "frmRenovacionFuncion";
-            Text = "Renovación por matrícula";
+            Text = "RenovaciÃ³n por matrÃ­cula";
             ResumeLayout(false);
             PerformLayout();
         }
@@ -102,7 +114,7 @@ namespace Gestion_Lockers
         {
             if (dgv.SelectedRows.Count == 0)
             {
-                MessageBox.Show("Selecciona una fila para editar.", "Atención", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Selecciona una fila para editar.", "AtenciÃ³n", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -111,7 +123,6 @@ namespace Gestion_Lockers
             if (editor.ShowDialog() == DialogResult.OK)
             {
                 // recargar la fila desde BD para mostrar cambios
-                // Si prefieres, puedes recargar todo el DataTable. Aquí recargamos la tabla entera por simplicidad.
                 try
                 {
                     using (var conn = DBConnection.GetConnection())
@@ -139,112 +150,241 @@ namespace Gestion_Lockers
             string matricula = txtMatricula.Text.Trim();
             if (string.IsNullOrEmpty(matricula))
             {
-                MessageBox.Show("Ingrese la matrícula.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Ingrese la matrÃ­cula.", "ValidaciÃ³n", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtMatricula.Focus();
                 return;
             }
 
             try
             {
-                // 1) Obtener último registro de renovacion
-                DateTime inicioRen = DateTime.MinValue;
-                DateTime finRen = DateTime.MinValue;
+                // 1) Obtener id_alumno desde la matricula
                 using (var conn = DBConnection.GetConnection())
-                using (var cmd = new SQLiteCommand("SELECT fecha_inicio, fecha_fin FROM renovacion ORDER BY fecha_inicio DESC LIMIT 1;", conn))
-                using (var dr = cmd.ExecuteReader())
+                using (var cmd = new SQLiteCommand("SELECT id_alumno, nombre, telefono FROM alumnos WHERE matricula = @mat LIMIT 1;", conn))
                 {
-                    if (dr.Read())
+                    cmd.Parameters.AddWithValue("@mat", matricula);
+                    using var r = cmd.ExecuteReader();
+                    if (r.Read())
                     {
-                        var sInicio = dr["fecha_inicio"]?.ToString();
-                        var sFin = dr["fecha_fin"]?.ToString();
-                        if (!DateTime.TryParse(sInicio, null, DateTimeStyles.RoundtripKind, out inicioRen) ||
-                            !DateTime.TryParse(sFin, null, DateTimeStyles.RoundtripKind, out finRen))
-                        {
-                            // intentar parseo más permisivo
-                            DateTime.TryParse(sInicio, out inicioRen);
-                            DateTime.TryParse(sFin, out finRen);
-                        }
+                        alumnoId = r["id_alumno"]?.ToString();
                     }
                     else
                     {
-                        MessageBox.Show("No hay periodos de renovación definidos.", "Información", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show("No se encontrÃ³ ningÃºn alumno con esa matrÃ­cula.", "InformaciÃ³n", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return;
                     }
                 }
 
-                // verificar si hoy está dentro del periodo
-                DateTime hoy = DateTime.UtcNow.Date;
-                if (hoy < inicioRen.Date || hoy > finRen.Date)
+                if (string.IsNullOrEmpty(alumnoId))
                 {
-                    MessageBox.Show("No hay una renovación vigente hoy.", "Información", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("No se pudo resolver el alumno.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
-                // 2) Comprobar que el alumno tuvo asignación durante ese periodo (ciclo pasado)
-                int? lockerAnterior = null;
+                // 2) Obtener asignaciones activas del alumno que estÃ¡n marcadas para renovaciÃ³n (o todas activas si lo prefieres)
+                var dt = new DataTable();
                 using (var conn = DBConnection.GetConnection())
-                using (var cmd = new SQLiteCommand("SELECT id_locker FROM asignaciones WHERE matricula = @mat AND fecha_inicio BETWEEN @f1 AND @f2 LIMIT 1;", conn))
+                using (var da = new SQLiteDataAdapter(@"
+            SELECT a.id_locker AS id_locker, l.estado AS estado, a.fecha_inicio, al.nombre AS nombre, al.telefono AS telefono
+            FROM asignaciones a
+            JOIN lockers l ON a.id_locker = l.id_locker
+            JOIN alumnos al ON a.id_alumno = al.id_alumno
+            WHERE a.id_alumno = @id_alumno
+              AND a.activa = 1
+              AND (l.estado LIKE '%Renov%' COLLATE NOCASE OR l.estado = '2' OR l.estado = 'Renovacion')
+            ORDER BY a.id_locker ASC;", conn))
                 {
-                    cmd.Parameters.AddWithValue("@mat", matricula);
-                    cmd.Parameters.AddWithValue("@f1", inicioRen.ToString("o"));
-                    cmd.Parameters.AddWithValue("@f2", finRen.ToString("o"));
-                    cmd.Connection = DBConnection.GetConnection();
-                    // NOTE: DBConnection.GetConnection() returns an open connection; avoid opening twice
+                    da.SelectCommand.Parameters.AddWithValue("@id_alumno", alumnoId);
+                    da.Fill(dt);
                 }
 
-                // mejor usar una única conexión
-                using (var conn2 = DBConnection.GetConnection())
-                using (var cmd2 = new SQLiteCommand("SELECT id_locker FROM asignaciones WHERE matricula = @mat AND fecha_inicio BETWEEN @f1 AND @f2 LIMIT 1;", conn2))
+                if (dt.Rows.Count == 0)
                 {
-                    cmd2.Parameters.AddWithValue("@mat", matricula);
-                    cmd2.Parameters.AddWithValue("@f1", inicioRen.ToString("o"));
-                    cmd2.Parameters.AddWithValue("@f2", finRen.ToString("o"));
-                    using (var dr2 = cmd2.ExecuteReader())
+                    MessageBox.Show("El alumno no tiene lockers marcados para renovaciÃ³n.", "InformaciÃ³n", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // 3) Si hay una sola asignaciÃ³n -> abrir frmDatosRenovacion directamente (similar a Principal.BtnRenovar_Click)
+                if (dt.Rows.Count == 1)
+                {
+                    var row = dt.Rows[0];
+                    int lockerId = Convert.ToInt32(row["id_locker"]);
+                    string nombre = row["nombre"]?.ToString() ?? string.Empty;
+                    string telefono = row["telefono"]?.ToString() ?? string.Empty;
+                    // traer el id de carrera del alumno desde la tabla alumnos
+                    int carreraId = 0;
+                    using (var conn = DBConnection.GetConnection())
+                    using (var cmd = new SQLiteCommand("SELECT id_carrera FROM alumnos WHERE id_alumno = @id_alumno LIMIT 1;", conn))
                     {
-                        if (dr2.Read())
+                        cmd.Parameters.AddWithValue("@id_alumno", alumnoId);
+                        carreraId = Convert.ToInt32(cmd.ExecuteScalar());
+                    }
+                    if (carreraId != 0)
+                    {
+                        carreraId = 0;
+                    }
+
+                    using var dlg = new frmDatosRenovacion(alumnoId, matricula, nombre, telefono, carreraId, lockerId);
+
+                    if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+                    // Guardar datos actualizados
+                    Funciones.ActualizarDatosAlumno(alumnoId!, dlg.NombreActualizado, dlg.TelefonoActualizado, dlg.IdCarreraSeleccionada);
+
+                    // Si se renueva manteniendo el mismo locker, ejecutar la renovaciÃ³n (cierra y crea nueva asignaciÃ³n)
+                    if (dlg.MismoLocker)
+                    {
+                        if (Funciones.EjecutarRenovacion(alumnoId!, lockerId.ToString(), lockerId, dlg.AtendidoPor ?? string.Empty))
                         {
-                            lockerAnterior = dr2["id_locker"] != DBNull.Value ? Convert.ToInt32(dr2["id_locker"]) : (int?)null;
+                            MessageBox.Show("RenovaciÃ³n realizada correctamente.", "Ã‰xito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
                         }
+                        else
+                        {
+                            MessageBox.Show("Error al realizar la renovaciÃ³n.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        if (_ownerPrincipal != null)
+                        {
+                            _ownerPrincipal.ActivateRenovationSelection(alumnoId, lockerId.ToString(), dlg.AtendidoPor ?? string.Empty);
+
+                            this.Close();
+                            return;
+                        }
+
+                        MessageBox.Show("Para cambiar de locker debe abrir esta pantalla desde la ventana principal (MenÃº â†’ Renovar) para poder seleccionar el nuevo locker en el mapa.", "InformaciÃ³n", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
                     }
                 }
 
-                if (!lockerAnterior.HasValue)
+                // 4) Si hay varias asignaciones -> mostrar selector con opciones (Renovar todos / Seleccionar uno)
+                using (var selector = new Form())
                 {
-                    MessageBox.Show("El alumno no tiene asignación en el ciclo pasado; no puede renovar automáticamente.", "Información", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
+                    selector.Text = $"Asignaciones en renovaciÃ³n - {matricula}";
+                    selector.StartPosition = FormStartPosition.CenterParent;
+                    selector.Size = new Size(600, 400);
+                    selector.FormBorderStyle = FormBorderStyle.Sizable;
+
+                    var dgvSel = new DataGridView
+                    {
+                        Dock = DockStyle.Top,
+                        Height = 280,
+                        ReadOnly = true,
+                        SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                        DataSource = dt
+                    };
+                    selector.Controls.Add(dgvSel);
+
+                    var btnPanel = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 60, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8) };
+                    selector.Controls.Add(btnPanel);
+
+                    var btnRenovarTodos = new Button { Text = "Renovar todos", Width = 140, Height = 36 };
+                    var btnSeleccionar = new Button { Text = "Seleccionar uno", Width = 140, Height = 36 };
+                    var btnCancelar = new Button { Text = "Cancelar", Width = 100, Height = 36 };
+
+                    btnPanel.Controls.Add(btnCancelar);
+                    btnPanel.Controls.Add(btnSeleccionar);
+                    btnPanel.Controls.Add(btnRenovarTodos);
+
+                    btnCancelar.Click += (_, _) => selector.DialogResult = DialogResult.Cancel;
+
+                    // Renovar todos: iterar y ejecutar renovaciÃ³n manteniendo cada locker
+                    btnRenovarTodos.Click += (_, _) =>
+                    {
+                        int success = 0, fail = 0;
+                        foreach (DataRow r in dt.Rows)
+                        {
+                            if (!int.TryParse(r["id_locker"].ToString(), out int lid)) { fail++; continue; }
+                            // Ejecutar renovacion manteniendo el mismo locker
+                            if (Funciones.EjecutarRenovacion(alumnoId!, lid.ToString(), lid, string.Empty)) success++; else fail++;
+                        }
+
+                        MessageBox.Show($"Renovaciones completadas: {success}. Fallidas: {fail}.", "Resultado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        selector.DialogResult = DialogResult.OK;
+                    };
+
+                    // Seleccionar uno: abrir frmDatosRenovacion para la fila seleccionada
+                    btnSeleccionar.Click += (_, _) =>
+                    {
+                        if (dgvSel.SelectedRows.Count == 0)
+                        {
+                            MessageBox.Show("Seleccione una fila primero.", "AtenciÃ³n", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+
+                        var selRow = ((DataRowView)dgvSel.SelectedRows[0].DataBoundItem).Row;
+                        if (!int.TryParse(selRow["id_locker"].ToString(), out int lockerSel))
+                        {
+                            MessageBox.Show("Id de locker invÃ¡lido.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+
+                        string nombre = selRow["nombre"]?.ToString() ?? string.Empty;
+                        string telefono = selRow["telefono"]?.ToString() ?? string.Empty;
+                        // traer el id de carrera del alumno desde la tabla alumnos
+                        int carreraId = 0;
+                        using (var conn = DBConnection.GetConnection())
+                        using (var cmd = new SQLiteCommand("SELECT id_carrera FROM alumnos WHERE id_alumno = @id_alumno LIMIT 1;", conn))
+                        {
+                            cmd.Parameters.AddWithValue("@id_alumno", alumnoId);
+                            carreraId = Convert.ToInt32(cmd.ExecuteScalar());
+                        }
+                        if (carreraId != 0)
+                        {
+                            carreraId = 0;
+                        }
+
+                        using var dlg = new frmDatosRenovacion(alumnoId, matricula, nombre, telefono, carreraId, lockerSel);
+                        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+                        // Actualizar datos alumno
+                        Funciones.ActualizarDatosAlumno(alumnoId!, dlg.NombreActualizado, dlg.TelefonoActualizado, dlg.IdCarreraSeleccionada);
+
+                        if (dlg.MismoLocker)
+                        {
+                            if (Funciones.EjecutarRenovacion(alumnoId!, lockerSel.ToString(), lockerSel, dlg.AtendidoPor ?? string.Empty))
+                            {
+                                MessageBox.Show("RenovaciÃ³n realizada correctamente.", "Ã‰xito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
+                            else
+                            {
+                                MessageBox.Show("Error al realizar la renovaciÃ³n.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                        else
+                        {
+                            if (_ownerPrincipal != null) //REF PRINCIPAL
+                            {
+                                _ownerPrincipal.ActivateRenovationSelection(alumnoId, lockerSel.ToString(), dlg.AtendidoPor ?? string.Empty);
+
+                                this.Close();
+                                return;
+                            }
+
+                            MessageBox.Show("Para reasignar a otro locker, abra la renovaciÃ³n desde la ventana principal para poder seleccionar el destino en el mapa.", "InformaciÃ³n", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+
+                        selector.DialogResult = DialogResult.OK;
+                    };
+
+                    if (selector.ShowDialog(this) == DialogResult.OK)
+                    {
+                        return;
+                    }
                 }
-
-                // 3) Verificar que el locker tenga estatus de renovación (o icono)
-                string estadoLocker = string.Empty;
-                using (var conn = DBConnection.GetConnection())
-                using (var cmd = new SQLiteCommand("SELECT estado FROM lockers WHERE id_locker = @id LIMIT 1;", conn))
-                {
-                    cmd.Parameters.AddWithValue("@id", lockerAnterior.Value);
-                    var obj = cmd.ExecuteScalar();
-                    estadoLocker = obj?.ToString() ?? string.Empty;
-                }
-
-                // Aceptar si contiene "renov" (case-insensitive) o es '2' (posible código)
-                bool esRenovacion = !string.IsNullOrEmpty(estadoLocker) &&
-                    (estadoLocker.IndexOf("renov", StringComparison.OrdinalIgnoreCase) >= 0 || estadoLocker.Equals("2"));
-
-                if (!esRenovacion)
-                {
-                    MessageBox.Show("El locker anterior no está marcado para renovación.", "Información", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
-
-                // Todo OK: abrir FrmAsignacion en modo renovación precargado
-                //using (var frm = new FrmAsignacion(matricula, lockerAnterior, true))
-                //{
-                //    frm.StartPosition = FormStartPosition.CenterParent;
-                //    frm.ShowDialog(this);
-                //}
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error en flujo de renovación: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error en flujo de renovaciÃ³n: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void btnCancelar_Click(object sender, EventArgs e)
+        {
+            this.Close();
         }
     }
 }

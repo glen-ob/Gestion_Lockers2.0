@@ -11,6 +11,9 @@ namespace Gestion_Lockers
         public bool CloseOnSuccess { get; set; } = false;
         private bool IsEditMode { get; set; } = false;
 
+        public string? id_alumno { get; set; } = null;
+        public string? carrera { get; set; } = string.Empty;
+
         public frmAltaAlumno()
         {
             InitializeComponent();
@@ -32,34 +35,58 @@ namespace Gestion_Lockers
                 textBox3.Text = initialMatricula;
                 if (IsEditMode)
                 {
-                    // matrícula no editable en modo edición
+                    // matrícula si puede ser editada ya que no es el id_alumno
                     try
                     {
-                        textBox3.ReadOnly = true;
+                        textBox3.ReadOnly = false;
                     }
                     catch { }
                     btnagregar.Text = "Guardar";
-                    CargarAlumno(initialMatricula);
+                    try
+                    {
+                        // 1) Obtener id_alumno desde la matricula
+                        using (var conn = DBConnection.GetConnection())
+                        using (var cmd = new SQLiteCommand("SELECT id_alumno FROM alumnos WHERE matricula = @mat LIMIT 1;", conn))
+                        {
+                            cmd.Parameters.AddWithValue("@mat", initialMatricula);
+                            using var r = cmd.ExecuteReader();
+                            if (r.Read())
+                            {
+                                id_alumno = r["id_alumno"]?.ToString();
+                            }
+                            else
+                            {
+                                MessageBox.Show("No se encontró ningún alumno con esa matrícula.", "Información", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                return;
+                            }
+                            CargarAlumno(id_alumno);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error al obtener el alumno: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
                 }
             }
         }
-
         private void CargarAlumno(string id_alumno)
         {
             try
             {
-                using (var conn = DBConnection.GetConnection())
-                using (var cmd = new SQLiteCommand("SELECT nombre, telefono, grupo_academico, grupo_cultural FROM alumnos WHERE id_alumno = @id LIMIT 1;", conn))
+                using (var conn2 = DBConnection.GetConnection())
+                using (var cmd2 = new SQLiteCommand("SELECT nombre, telefono, grupo_academico, grupo_cultural, id_carrera FROM alumnos WHERE id_alumno = @id LIMIT 1;", conn2))
                 {
-                    cmd.Parameters.AddWithValue("@id", id_alumno);
-                    using (var dr = cmd.ExecuteReader())
+                    cmd2.Parameters.AddWithValue("@id", id_alumno);
+                    using (var dr2 = cmd2.ExecuteReader())
                     {
-                        if (dr.Read())
+                        if (dr2.Read())
                         {
-                            textBox1.Text = dr["nombre"]?.ToString() ?? string.Empty;
-                            textBox2.Text = dr["telefono"]?.ToString() ?? string.Empty;
-                            var gAcad = dr["grupo_academico"]?.ToString() ?? "0";
-                            var gCult = dr["grupo_cultural"]?.ToString() ?? "0";
+                            textBox1.Text = dr2["nombre"]?.ToString() ?? string.Empty;
+                            textBox2.Text = dr2["telefono"]?.ToString() ?? string.Empty;
+                            var gAcad = dr2["grupo_academico"]?.ToString() ?? "0";
+                            var gCult = dr2["grupo_cultural"]?.ToString() ?? "0";
+                            carrera = dr2["id_carrera"]?.ToString() ?? string.Empty;
                             try { rbGrupoAcademico.Checked = gAcad == "1"; } catch { }
                             try { rbGrupoCultural.Checked = gCult == "1"; } catch { }
                         }
@@ -77,7 +104,6 @@ namespace Gestion_Lockers
             string nombre = textBox1.Text.Trim();    // Nombre
             string telefono = textBox2.Text.Trim();  // Teléfono
             string matricula = textBox3.Text.Trim(); // Matrícula
-            string? id_alumno = string.Empty;
 
             // Validaciones básicas
             if (string.IsNullOrEmpty(nombre) || string.IsNullOrEmpty(matricula) || string.IsNullOrEmpty(telefono))
@@ -110,11 +136,13 @@ namespace Gestion_Lockers
                 if (IsEditMode)
                 {
                     using (var conn = DBConnection.GetConnection())
-                    using (var cmd = new SQLiteCommand("UPDATE alumnos SET nombre=@nombre, telefono=@telefono, grupo_academico=@gAcad, grupo_cultural=@gCult WHERE id_alumno=@id;", conn))
+                    using (var cmd = new SQLiteCommand("UPDATE alumnos SET nombre=@nombre, matricula=@matricula, telefono=@telefono, grupo_academico=@gAcad, grupo_cultural=@gCult, id_carrera=@carrera WHERE id_alumno=@id_alumno", conn))
                     {
-                        cmd.Parameters.AddWithValue("@id", id_alumno);
+                        cmd.Parameters.AddWithValue("@id_alumno", id_alumno);
                         cmd.Parameters.AddWithValue("@nombre", nombre);
+                        cmd.Parameters.AddWithValue("@matricula", matricula);
                         cmd.Parameters.AddWithValue("@telefono", telefono);
+                        cmd.Parameters.AddWithValue("@carrera", carrera);
                         cmd.Parameters.AddWithValue("@gAcad", grupoAcademico);
                         cmd.Parameters.AddWithValue("@gCult", grupoCultural);
                         int affected = cmd.ExecuteNonQuery();
@@ -139,10 +167,11 @@ namespace Gestion_Lockers
                 else
                 {
                     using (var conn = DBConnection.GetConnection())
-                    using (var cmd = new SQLiteCommand("INSERT INTO alumnos (matricula, nombre, telefono, grupo_academico, grupo_cultural) VALUES (@matricula, @nombre, @telefono, @gAcad, @gCult);", conn))
+                    using (var cmd = new SQLiteCommand("INSERT INTO alumnos (id_alumno, nombre, matricula, telefono, grupo_academico, grupo_cultural) VALUES (@id_alumno, @nombre, @matricula, @telefono, @gAcad, @gCult);", conn))
                     {
-                        cmd.Parameters.AddWithValue("@matricula", matricula);
+                        cmd.Parameters.AddWithValue("@id_alumno", id_alumno);
                         cmd.Parameters.AddWithValue("@nombre", nombre);
+                        cmd.Parameters.AddWithValue("@matricula", matricula);
                         cmd.Parameters.AddWithValue("@telefono", telefono);
                         cmd.Parameters.AddWithValue("@gAcad", grupoAcademico);
                         cmd.Parameters.AddWithValue("@gCult", grupoCultural);

@@ -14,15 +14,17 @@ namespace Gestion_Lockers
 
             // El picker no debe permitir fechas pasadas
             dateTimePicker1.MinDate = DateTime.Today.AddDays(1);
-            dateTimePicker1.Value = DateTime.Today.AddDays(1);
+            // Inicializar el valor por defecto al siguiente día a las 23:59
+            dateTimePicker1.Value = DateTime.Today.AddDays(1).Date.AddHours(23).AddMinutes(59);
         }
 
         private void BtnIniciar_Click(object? sender, EventArgs e)
         {
-            DateTime fechaFin = dateTimePicker1.Value.Date;
+            // Tomar la fecha seleccionada y forzar hora 23:59 del mismo día
+            DateTime fechaFin = dateTimePicker1.Value.Date.AddHours(23).AddMinutes(59);
 
-            // Validar que la fecha fin sea futura
-            if (fechaFin <= DateTime.Today)
+            // Validar que la fecha fin sea futura (comparar por fecha)
+            if (fechaFin.Date <= DateTime.Today)
             {
                 MessageBox.Show("La fecha de fin debe ser posterior a hoy.",
                     "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -53,12 +55,12 @@ namespace Gestion_Lockers
                 using var conn = DBConnection.GetConnection();
                 using var tran = conn.BeginTransaction();
 
-                // Insertar periodo — fecha guardada en formato YYYY-MM-DD (compatible con date() de SQLite)
+                // Insertar periodo — ahora guardamos fecha y hora (compatible con datetime)
                 using (var ins = new SQLiteCommand(@"
-                    INSERT INTO Renovacion (fecha_inicio, fecha_fin, id_usu_renovacion, procesado)
+                    INSERT INTO renovacion (fecha_inicio, fecha_fin, id_usu_renovacion, procesado)
                     VALUES (date('now'), @fin, NULL, 0);", conn, tran))
                 {
-                    ins.Parameters.AddWithValue("@fin", fechaFin.ToString("yyyy-MM-dd"));
+                    ins.Parameters.AddWithValue("@fin", fechaFin.ToString("yyyy-MM-dd HH:mm:ss"));
                     ins.ExecuteNonQuery();
                 }
 
@@ -72,7 +74,7 @@ namespace Gestion_Lockers
                 tran.Commit();
 
                 MessageBox.Show(
-                    $"Periodo de renovación iniciado.\nFecha límite: {fechaFin:dd/MM/yyyy}",
+                    $"Periodo de renovación iniciado.\nFecha límite: {fechaFin:dd/MM/yyyy HH:mm}",
                     "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 DialogResult = DialogResult.OK;
@@ -83,6 +85,11 @@ namespace Gestion_Lockers
                 MessageBox.Show($"Error al iniciar el periodo de renovación: {ex.Message}",
                     "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void frmPeriodoRenovacion_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }

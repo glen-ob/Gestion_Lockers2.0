@@ -15,7 +15,6 @@ namespace Gestion_Lockers
             InitializeComponent();
             txtContra.UseSystemPasswordChar = true;
 
-            // Un único punto de suscripción — el Designer no debe tener otro Click aquí
             btnicio.Click += Btnicio_Click;
         }
 
@@ -82,10 +81,13 @@ namespace Gestion_Lockers
             }
         }
 
-        // Stub vacío que el Designer conectó — ya no hace nada
         private void label1_Click(object sender, EventArgs e) { }
 
-        // Stub vacío — el Designer lo generó pero el clic real lo maneja Btnicio_Click
         private void btnicio_Click_1(object sender, EventArgs e) { }
+
+        private void txtUsu_TextChanged(object sender, EventArgs e)
+        {
+
+        }
     }
 }
